@@ -1,12 +1,5 @@
 package com.example.ui
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.with
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +61,7 @@ import com.example.ui.components.ClaimVaultLogo
 import com.example.ui.theme.EmeraldDark
 import com.example.ui.theme.EmeraldLightContainer
 import com.example.ui.theme.EmeraldPrimary
+import kotlinx.coroutines.launch
 
 data class OnboardingPage(
     val title: String,
@@ -81,14 +78,11 @@ enum class IllustrationType {
     NOTIFY_PDF
 }
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun OnboardingScreen(
     onComplete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var currentPageIndex by remember { mutableIntStateOf(0) }
-
     val pages = remember {
         listOf(
             OnboardingPage(
@@ -118,6 +112,9 @@ fun OnboardingScreen(
         )
     }
 
+    val pagerState = rememberPagerState(pageCount = { pages.size })
+    val coroutineScope = rememberCoroutineScope()
+    val currentPageIndex = pagerState.currentPage
     val currentPage = pages[currentPageIndex]
 
     Surface(
@@ -150,7 +147,7 @@ fun OnboardingScreen(
                 )
             }
 
-            // Main sliding layout content (constrained to look premium and centered on wider screens)
+            // Main swipeable layout content
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -158,24 +155,17 @@ fun OnboardingScreen(
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
-                AnimatedContent(
-                    targetState = currentPageIndex,
-                    transitionSpec = {
-                        if (targetState > initialState) {
-                            slideInHorizontally { width -> width } + fadeIn() with
-                                    slideOutHorizontally { width -> -width } + fadeOut()
-                        } else {
-                            slideInHorizontally { width -> -width } + fadeIn() with
-                                    slideOutHorizontally { width -> width } + fadeOut()
-                        }
-                    },
-                    label = "onboarding_animation"
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxWidth()
                 ) { targetPage ->
                     val page = pages[targetPage]
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
                     ) {
                         // High-fidelity illustration panel
                         Box(
@@ -295,10 +285,12 @@ fun OnboardingScreen(
                     // Next / Get Started button
                     Button(
                         onClick = {
-                            if (currentPageIndex < pages.lastIndex) {
-                                currentPageIndex++
-                            } else {
-                                onComplete()
+                            coroutineScope.launch {
+                                if (pagerState.currentPage < pages.lastIndex) {
+                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                } else {
+                                    onComplete()
+                                }
                             }
                         },
                         colors = ButtonDefaults.buttonColors(

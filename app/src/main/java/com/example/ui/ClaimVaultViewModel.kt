@@ -53,9 +53,6 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         FirebaseManager.init(application)
-        viewModelScope.launch {
-            repository.seedInitialDataIfEmpty()
-        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -222,6 +219,7 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
                 val parsed = OcrHelper.parseReceiptText(sampleOcrText)
                 lastOcrResult.value = parsed
 
+                smartPromptManager.onOcrSuccess()
                 onComplete(imagePath, parsed)
             } catch (e: Exception) {
                 messageEvent.value = "Failed to process receipt photo: ${e.localizedMessage}"
@@ -237,6 +235,7 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
             try {
                 val pdfFile = PdfClaimExporter.generateClaimPdf(context, item)
                 PdfClaimExporter.shareClaimPdf(context, pdfFile)
+                smartPromptManager.onPdfExportSuccess()
             } catch (e: Exception) {
                 messageEvent.value = "Error generating claim PDF: ${e.localizedMessage}"
             }

@@ -1,18 +1,44 @@
-*.iml
+# Built artifacts
+*.apk
+*.aab
+*.aar
+*.jks
+
+# Gradle
 .gradle
+/build
+/app/build
+# (keep wrapper)
+!gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin
 .kotlin
-/local.properties
+*.kotlin_module
+
+# Android Studio / IntelliJ
+.idea
+*.iml
+*.ipr
+*.iws
+/out
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+
+# Local configuration
 local.properties
 .env
-debug.keystore
+.env.example
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Captures and profiling
+/captures
+*.hprof
+.externalNativeBuild
+.cxx

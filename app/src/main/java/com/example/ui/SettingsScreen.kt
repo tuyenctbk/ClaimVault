@@ -212,22 +212,10 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Button(
-                            onClick = { viewModel.smartPromptManager.triggerRateDialog() },
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("rate_app_settings_button"),
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary, contentColor = Color.Black)
-                        ) {
-                            Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Rate 5 Stars", fontWeight = FontWeight.Bold)
-                        }
-
                         OutlinedButton(
                             onClick = { viewModel.smartPromptManager.triggerShareDialog() },
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
                                 .testTag("share_app_settings_button")
                         ) {
                             Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))

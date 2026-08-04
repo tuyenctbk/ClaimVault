@@ -1,0 +1,6 @@
+{
+  "name": "ClaimVault",
+  "description": "A minimalist, privacy-first Warranty & Receipt Keeper that operates 100% offline with smart receipt parsing, expiry checkups, and claim export packages.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

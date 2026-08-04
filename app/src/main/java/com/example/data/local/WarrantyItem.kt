@@ -22,5 +22,6 @@ data class WarrantyItem(
     val reminder30Days: Boolean = true,
     val reminder7Days: Boolean = true,
     val reminder1Day: Boolean = true,
-    val createdAtEpoch: Long = System.currentTimeMillis()
+    val createdAtEpoch: Long = System.currentTimeMillis(),
+    val tags: String = ""
 )

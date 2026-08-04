@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CheckCircle
@@ -42,12 +43,15 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -65,6 +69,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -87,6 +94,8 @@ import com.example.ui.theme.RedAlertContainer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.util.AppLanguage
+import com.example.util.localize
 
 import com.example.ui.components.ClaimVaultHeroBanner
 import com.example.ui.components.ClaimVaultLogo
@@ -97,15 +106,20 @@ fun HomeScreen(
     viewModel: ClaimVaultViewModel,
     onNavigateToAdd: () -> Unit,
     onNavigateToDetail: (Long) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToDashboard: () -> Unit
 ) {
     val context = LocalContext.current
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
     val selectedStatus by viewModel.selectedStatus.collectAsStateWithLifecycle()
+    val selectedTag by viewModel.selectedTag.collectAsStateWithLifecycle()
+    val availableTags by viewModel.availableTags.collectAsStateWithLifecycle()
+    val selectedSort by viewModel.selectedSort.collectAsStateWithLifecycle()
     val filteredList by viewModel.filteredWarranties.collectAsStateWithLifecycle()
     val stats by viewModel.vaultStats.collectAsStateWithLifecycle()
     val allWarranties by viewModel.allWarranties.collectAsStateWithLifecycle()
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
 
     val now = System.currentTimeMillis()
     val dayMs = 86400000L
@@ -137,6 +151,15 @@ fun HomeScreen(
                 },
                 actions = {
                     IconButton(
+                        onClick = onNavigateToDashboard,
+                        modifier = Modifier.testTag("dashboard_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.BarChart,
+                            contentDescription = "Dashboard & Analytics"
+                        )
+                    }
+                    IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.testTag("settings_button")
                     ) {
@@ -155,7 +178,7 @@ fun HomeScreen(
             ExtendedFloatingActionButton(
                 onClick = onNavigateToAdd,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("SCAN NEW RECEIPT", fontWeight = FontWeight.Bold) },
+                text = { Text("SCAN NEW RECEIPT".localize(appLanguage), fontWeight = FontWeight.Bold) },
                 containerColor = EmeraldPrimary,
                 contentColor = Color.Black,
                 modifier = Modifier
@@ -182,6 +205,7 @@ fun HomeScreen(
                 item {
                     ClaimVaultHeroBanner(
                         stats = stats,
+                        appLanguage = appLanguage,
                         onAddClick = onNavigateToAdd,
                         onScanClick = onNavigateToAdd,
                         onShareClick = { viewModel.smartPromptManager.triggerShareDialog() }
@@ -192,7 +216,7 @@ fun HomeScreen(
                 if (expiringItems.isNotEmpty()) {
                     item {
                         Text(
-                            text = "EXPIRING SOON (${expiringItems.size} Item${if (expiringItems.size > 1) "s" else ""})",
+                            text = "EXPIRING SOON".localize(appLanguage) + " (${expiringItems.size} " + (if (expiringItems.size > 1) "Items".localize(appLanguage) else "Items".localize(appLanguage)) + ")",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.tertiary,
                             fontWeight = FontWeight.Bold,
@@ -241,11 +265,65 @@ fun HomeScreen(
             // Search Bar & Filters
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "MY VAULT (${stats.totalCount} Warranties)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ACTIVE PROTECTION".localize(appLanguage) + " (${stats.totalCount} " + "warranties".localize(appLanguage) + ")",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        var sortMenuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            OutlinedButton(
+                                onClick = { sortMenuExpanded = true },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.testTag("sort_dropdown_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Sort,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = EmeraldPrimary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = selectedSort.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = sortMenuExpanded,
+                                onDismissRequest = { sortMenuExpanded = false }
+                            ) {
+                                SortOption.values().forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.label) },
+                                        onClick = {
+                                            viewModel.selectedSort.value = option
+                                            sortMenuExpanded = false
+                                        },
+                                        leadingIcon = {
+                                            if (selectedSort == option) {
+                                                Icon(
+                                                    imageVector = Icons.Default.CheckCircle,
+                                                    contentDescription = null,
+                                                    tint = EmeraldPrimary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     OutlinedTextField(
                         value = searchQuery,
@@ -253,7 +331,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("search_input"),
-                        placeholder = { Text("Search by merchant, product, S/N...") },
+                        placeholder = { Text("Search your vault...".localize(appLanguage)) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
@@ -270,7 +348,7 @@ fun HomeScreen(
                     )
 
                     // Category Filter Chips
-                    val categories = listOf("All", "Electronics", "Home & Kitchen", "Fashion", "Automotive", "Tools", "Other")
+                    val categories = listOf("All", "Electronics", "Appliances", "Automotive", "Furniture", "Clothing", "Other")
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(vertical = 4.dp)
@@ -279,7 +357,7 @@ fun HomeScreen(
                             FilterChip(
                                 selected = selectedCategory == cat,
                                 onClick = { viewModel.selectedCategory.value = cat },
-                                label = { Text(cat) },
+                                label = { Text(cat.localize(appLanguage)) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = EmeraldPrimary,
                                     selectedLabelColor = Color.Black
@@ -297,12 +375,32 @@ fun HomeScreen(
                             FilterChip(
                                 selected = selectedStatus == st,
                                 onClick = { viewModel.selectedStatus.value = st },
-                                label = { Text(st) },
+                                label = { Text(st.localize(appLanguage)) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             )
+                        }
+                    }
+
+                    // Tag Filter Chips
+                    if (availableTags.size > 1) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(vertical = 2.dp)
+                        ) {
+                            items(availableTags) { tag ->
+                                FilterChip(
+                                    selected = selectedTag == tag,
+                                    onClick = { viewModel.selectedTag.value = tag },
+                                    label = { Text("🏷️ $tag") },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = EmeraldPrimary,
+                                        selectedLabelColor = Color.Black
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -312,11 +410,12 @@ fun HomeScreen(
             if (filteredList.isEmpty()) {
                 item {
                     EmptyVaultState(
-                        isFiltered = searchQuery.isNotEmpty() || selectedCategory != "All" || selectedStatus != "All",
+                        isFiltered = searchQuery.isNotEmpty() || selectedCategory != "All" || selectedStatus != "All" || selectedTag != "All",
                         onResetFilters = {
                             viewModel.searchQuery.value = ""
                             viewModel.selectedCategory.value = "All"
                             viewModel.selectedStatus.value = "All"
+                            viewModel.selectedTag.value = "All"
                         }
                     )
                 }
@@ -623,6 +722,28 @@ fun WarrantyVaultCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
+                    if (item.tags.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            item.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }.take(3).forEach { tag ->
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = tag,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

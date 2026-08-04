@@ -12,12 +12,20 @@ enum class ThemeMode {
     DARK
 }
 
+enum class AppLanguage(val displayName: String) {
+    EN("English"),
+    VI("Tiếng Việt")
+}
+
 class ThemePreferences(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("claim_vault_theme_prefs", Context.MODE_PRIVATE)
 
     private val _themeMode = MutableStateFlow(getSavedThemeMode())
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+
+    private val _appLanguage = MutableStateFlow(getSavedLanguage())
+    val appLanguage: StateFlow<AppLanguage> = _appLanguage.asStateFlow()
 
     private val _hasCompletedOnboarding = MutableStateFlow(prefs.getBoolean("has_completed_onboarding", false))
     val hasCompletedOnboarding: StateFlow<Boolean> = _hasCompletedOnboarding.asStateFlow()
@@ -34,6 +42,20 @@ class ThemePreferences(context: Context) {
     fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putString("theme_mode", mode.name).apply()
         _themeMode.value = mode
+    }
+
+    fun getSavedLanguage(): AppLanguage {
+        val langStr = prefs.getString("app_language", AppLanguage.EN.name) ?: AppLanguage.EN.name
+        return try {
+            AppLanguage.valueOf(langStr)
+        } catch (e: Exception) {
+            AppLanguage.EN
+        }
+    }
+
+    fun setAppLanguage(lang: AppLanguage) {
+        prefs.edit().putString("app_language", lang.name).apply()
+        _appLanguage.value = lang
     }
 
     fun completeOnboarding() {

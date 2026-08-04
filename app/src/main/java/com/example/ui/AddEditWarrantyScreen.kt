@@ -85,17 +85,21 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.example.util.AppLanguage
+import com.example.util.localize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditWarrantyScreen(
     viewModel: ClaimVaultViewModel,
     editingItemId: Long? = null,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToCameraScan: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val allWarranties by viewModel.allWarranties.collectAsStateWithLifecycle()
     val isScanningOcr by viewModel.isScanningOcr.collectAsStateWithLifecycle()
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
 
     val editingItem = remember(editingItemId, allWarranties) {
         if (editingItemId != null && editingItemId > 0L) {
@@ -106,15 +110,43 @@ fun AddEditWarrantyScreen(
     var title by remember { mutableStateOf(editingItem?.title ?: "") }
     var merchant by remember { mutableStateOf(editingItem?.merchant ?: "") }
     var priceText by remember { mutableStateOf(editingItem?.price?.toString() ?: "") }
+    var currency by remember { mutableStateOf(editingItem?.currency ?: try { java.util.Currency.getInstance(Locale.getDefault())?.symbol ?: "$" } catch(e: Exception) { "$" }) }
     var category by remember { mutableStateOf(editingItem?.category ?: "Electronics") }
     var warrantyDurationMonths by remember { mutableIntStateOf(editingItem?.warrantyDurationMonths ?: 12) } // 12, 24, 36, -1
     var serialNumber by remember { mutableStateOf(editingItem?.serialNumber ?: "") }
     var modelNumber by remember { mutableStateOf(editingItem?.modelNumber ?: "") }
     var notes by remember { mutableStateOf(editingItem?.notes ?: "") }
+    var tagsInput by remember { mutableStateOf(editingItem?.tags ?: "") }
     var purchaseDateEpoch by remember { mutableLongStateOf(editingItem?.purchaseDateEpoch ?: System.currentTimeMillis()) }
     var receiptImagePath by remember { mutableStateOf<String?>(editingItem?.receiptImagePath) }
 
     var ocrDetectedText by remember { mutableStateOf<String?>(null) }
+
+    // Check if returned from CameraScanScreen
+    LaunchedEffect(Unit) {
+        if (viewModel.scannedReceiptPath != null) {
+            receiptImagePath = viewModel.scannedReceiptPath
+            if (!viewModel.scannedMerchant.isNullOrBlank() && merchant.isBlank()) {
+                merchant = viewModel.scannedMerchant!!
+            }
+            if (viewModel.scannedAmount != null && viewModel.scannedAmount!! > 0.0 && priceText.isBlank()) {
+                priceText = viewModel.scannedAmount.toString()
+            }
+            if (viewModel.scannedDateEpoch != null && viewModel.scannedDateEpoch!! > 0L) {
+                purchaseDateEpoch = viewModel.scannedDateEpoch!!
+            }
+            if (viewModel.scannedCurrency != null && !viewModel.scannedCurrency.isNullOrBlank()) {
+                currency = viewModel.scannedCurrency!!
+            }
+            ocrDetectedText = "CameraX ML Kit OCR: ${viewModel.scannedMerchant ?: "Receipt"}, ${currency}${viewModel.scannedAmount ?: 0.0}"
+
+            viewModel.scannedReceiptPath = null
+            viewModel.scannedMerchant = null
+            viewModel.scannedAmount = null
+            viewModel.scannedDateEpoch = null
+            viewModel.scannedCurrency = null
+        }
+    }
 
     val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.US)
 
@@ -128,7 +160,7 @@ fun AddEditWarrantyScreen(
                     receiptImagePath = path
                 }
                 if (ocrResult != null) {
-                    ocrDetectedText = "Detected: ${ocrResult.merchant ?: "Receipt"}, $${ocrResult.totalAmount ?: "0.00"}"
+                    ocrDetectedText = "Detected: ${ocrResult.merchant ?: "Receipt"}, ${ocrResult.currency}${ocrResult.totalAmount ?: "0.00"}"
                     if (merchant.isBlank() && !ocrResult.merchant.isNullOrBlank()) {
                         merchant = ocrResult.merchant
                     }
@@ -138,6 +170,7 @@ fun AddEditWarrantyScreen(
                     if (ocrResult.purchaseDateEpoch != null) {
                         purchaseDateEpoch = ocrResult.purchaseDateEpoch
                     }
+                    currency = ocrResult.currency
                 }
             }
         }
@@ -162,7 +195,7 @@ fun AddEditWarrantyScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (editingItem != null) "Edit Warranty" else "Quick Add Receipt",
+                        text = if (editingItem != null) "Edit Warranty".localize(appLanguage) else "Quick Add Receipt".localize(appLanguage),
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -173,7 +206,7 @@ fun AddEditWarrantyScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back".localize(appLanguage)
                         )
                     }
                 },
@@ -243,7 +276,7 @@ fun AddEditWarrantyScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Compressed < 300KB",
+                                        text = "Compressed < 300KB".localize(appLanguage),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color.White
                                     )
@@ -269,12 +302,12 @@ fun AddEditWarrantyScreen(
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "Snap or Select Receipt Photo",
+                                    text = "Snap or Select Receipt Photo".localize(appLanguage),
                                     fontWeight = FontWeight.Bold,
                                     color = EmeraldDark
                                 )
                                 Text(
-                                    text = "Auto-OCR extracts merchant & date instantly",
+                                    text = "Auto-OCR extracts merchant & date instantly".localize(appLanguage),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
@@ -284,8 +317,19 @@ fun AddEditWarrantyScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        OutlinedButton(
+                            onClick = { onNavigateToCameraScan() },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("camera_scan_receipt_button")
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Scan CameraX".localize(appLanguage))
+                        }
+
                         OutlinedButton(
                             onClick = { imagePickerLauncher.launch("image/*") },
                             modifier = Modifier
@@ -293,8 +337,8 @@ fun AddEditWarrantyScreen(
                                 .testTag("pick_receipt_photo_button")
                         ) {
                             Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (receiptImagePath != null) "Retake Photo" else "Upload Receipt")
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Upload Gallery".localize(appLanguage))
                         }
                     }
 
@@ -336,7 +380,7 @@ fun AddEditWarrantyScreen(
 
             // Step 2: Product & Merchant Info
             Text(
-                text = "Product Information",
+                text = "Product Information".localize(appLanguage),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -344,8 +388,8 @@ fun AddEditWarrantyScreen(
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Product Title *") },
-                placeholder = { Text("e.g., Sony WH-1000XM5, LG OLED TV") },
+                label = { Text("Product Title *".localize(appLanguage)) },
+                placeholder = { Text("e.g., Sony WH-1000XM5, LG OLED TV".localize(appLanguage)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("input_product_title"),
@@ -357,11 +401,23 @@ fun AddEditWarrantyScreen(
                 OutlinedTextField(
                     value = merchant,
                     onValueChange = { merchant = it },
-                    label = { Text("Store / Merchant *") },
-                    placeholder = { Text("e.g. Best Buy") },
+                    label = { Text("Store / Merchant *".localize(appLanguage)) },
+                    placeholder = { Text("e.g. Best Buy".localize(appLanguage)) },
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(1.5f)
                         .testTag("input_merchant"),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
+                )
+
+                OutlinedTextField(
+                    value = currency,
+                    onValueChange = { currency = it },
+                    label = { Text("Curr".localize(appLanguage)) },
+                    placeholder = { Text("$") },
+                    modifier = Modifier
+                        .width(75.dp)
+                        .testTag("input_currency"),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
                 )
@@ -369,11 +425,11 @@ fun AddEditWarrantyScreen(
                 OutlinedTextField(
                     value = priceText,
                     onValueChange = { priceText = it },
-                    label = { Text("Price ($)") },
+                    label = { Text("Price".localize(appLanguage)) },
                     placeholder = { Text("399.99") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(1.2f)
                         .testTag("input_price"),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
@@ -385,10 +441,10 @@ fun AddEditWarrantyScreen(
                 value = dateFormat.format(Date(purchaseDateEpoch)),
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Purchase Date") },
+                label = { Text("Purchase Date".localize(appLanguage)) },
                 trailingIcon = {
                     IconButton(onClick = { datePickerDialog.show() }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = "Select Date")
+                        Icon(Icons.Default.CalendarToday, contentDescription = "Select Date".localize(appLanguage))
                     }
                 },
                 modifier = Modifier
@@ -400,19 +456,20 @@ fun AddEditWarrantyScreen(
 
             // Category Selector
             Text(
-                text = "Category",
+                text = "Category".localize(appLanguage),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
 
             CategoryDropdown(
                 selectedCategory = category,
+                appLanguage = appLanguage,
                 onCategorySelected = { category = it }
             )
 
             // Warranty Duration Selector
             Text(
-                text = "Warranty Duration",
+                text = "Warranty Duration".localize(appLanguage),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -422,10 +479,10 @@ fun AddEditWarrantyScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 listOf(
-                    12 to "1 Year",
-                    24 to "2 Years",
-                    36 to "3 Years",
-                    -1 to "Lifetime"
+                    12 to "1 Year".localize(appLanguage),
+                    24 to "2 Years".localize(appLanguage),
+                    36 to "3 Years".localize(appLanguage),
+                    -1 to "Lifetime".localize(appLanguage)
                 ).forEach { (months, label) ->
                     val isSelected = warrantyDurationMonths == months
                     Surface(
@@ -457,7 +514,7 @@ fun AddEditWarrantyScreen(
 
             // Serial & Model Numbers
             Text(
-                text = "Claim Proof Identifiers (Optional)",
+                text = "Claim Proof Identifiers (Optional)".localize(appLanguage),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -466,7 +523,7 @@ fun AddEditWarrantyScreen(
                 OutlinedTextField(
                     value = modelNumber,
                     onValueChange = { modelNumber = it },
-                    label = { Text("Model Number") },
+                    label = { Text("Model Number".localize(appLanguage)) },
                     placeholder = { Text("WH1000XM5/B") },
                     modifier = Modifier
                         .weight(1f)
@@ -478,7 +535,7 @@ fun AddEditWarrantyScreen(
                 OutlinedTextField(
                     value = serialNumber,
                     onValueChange = { serialNumber = it },
-                    label = { Text("Serial Number") },
+                    label = { Text("Serial Number".localize(appLanguage)) },
                     placeholder = { Text("SN-982140") },
                     modifier = Modifier
                         .weight(1f)
@@ -491,12 +548,24 @@ fun AddEditWarrantyScreen(
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
-                label = { Text("Notes & Service History") },
-                placeholder = { Text("Coverage details, store receipt notes, repair history...") },
+                label = { Text("Notes & Service History".localize(appLanguage)) },
+                placeholder = { Text("Coverage details, store receipt notes, repair history...".localize(appLanguage)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp)
                     .testTag("input_notes"),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
+            )
+
+            OutlinedTextField(
+                value = tagsInput,
+                onValueChange = { tagsInput = it },
+                label = { Text("Custom Tags (comma separated)".localize(appLanguage)) },
+                placeholder = { Text("e.g. Tax, Business, Priority".localize(appLanguage)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("input_tags"),
+                singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
             )
 
@@ -519,7 +588,9 @@ fun AddEditWarrantyScreen(
                             notes = notes.trim(),
                             reminder30Days = editingItem?.reminder30Days ?: true,
                             reminder7Days = editingItem?.reminder7Days ?: true,
-                            reminder1Day = editingItem?.reminder1Day ?: true
+                            reminder1Day = editingItem?.reminder1Day ?: true,
+                            tags = tagsInput.trim(),
+                            currency = currency.trim().ifBlank { "$" }
                         )
                         onNavigateBack()
                     }
@@ -538,7 +609,7 @@ fun AddEditWarrantyScreen(
                 Icon(Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (editingItem != null) "UPDATE VAULT ITEM" else "SAVE TO CLAIMVAULT",
+                    text = if (editingItem != null) "UPDATE VAULT ITEM".localize(appLanguage) else "SAVE TO CLAIMVAULT".localize(appLanguage),
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 15.sp
                 )
@@ -554,17 +625,18 @@ fun AddEditWarrantyScreen(
 @Composable
 fun CategoryDropdown(
     selectedCategory: String,
+    appLanguage: AppLanguage,
     onCategorySelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val categories = listOf("Electronics", "Home & Kitchen", "Fashion", "Automotive", "Tools", "Other")
+    val categories = listOf("Electronics", "Appliances", "Automotive", "Furniture", "Clothing", "Other")
 
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            value = selectedCategory,
+            value = selectedCategory.localize(appLanguage),
             onValueChange = {},
             readOnly = true,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
@@ -581,7 +653,7 @@ fun CategoryDropdown(
         ) {
             categories.forEach { cat ->
                 DropdownMenuItem(
-                    text = { Text(cat) },
+                    text = { Text(cat.localize(appLanguage)) },
                     onClick = {
                         onCategorySelected(cat)
                         expanded = false

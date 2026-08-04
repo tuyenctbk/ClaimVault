@@ -63,6 +63,8 @@ import com.example.ui.VaultStats
 import com.example.ui.theme.EmeraldDark
 import com.example.ui.theme.EmeraldLightContainer
 import com.example.ui.theme.EmeraldPrimary
+import com.example.util.AppLanguage
+import com.example.util.localize
 
 /**
  * ClaimVault Brand Logo Badge Component
@@ -310,6 +312,7 @@ fun ShareAppDialog(
 @Composable
 fun ClaimVaultHeroBanner(
     stats: VaultStats,
+    appLanguage: AppLanguage,
     onAddClick: () -> Unit,
     onScanClick: () -> Unit,
     onShareClick: () -> Unit,
@@ -353,7 +356,7 @@ fun ClaimVaultHeroBanner(
                                 fontSize = 18.sp
                             )
                             Text(
-                                text = "Smart Warranty & Receipt Hub",
+                                text = "Smart Warranty & Receipt Hub".localize(appLanguage),
                                 color = Color(0xFFA7F3D0),
                                 fontSize = 12.sp
                             )
@@ -369,7 +372,7 @@ fun ClaimVaultHeroBanner(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
-                            contentDescription = "Share App",
+                            contentDescription = "Share App".localize(appLanguage),
                             tint = Color.White
                         )
                     }
@@ -389,7 +392,7 @@ fun ClaimVaultHeroBanner(
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
-                            Text("Total Protected", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                            Text("Total Protected".localize(appLanguage), color = Color(0xFF94A3B8), fontSize = 11.sp)
                             Text(
                                 text = "$${String.format("%.2f", stats.totalProtectedValue)}",
                                 color = Color.White,
@@ -406,9 +409,9 @@ fun ClaimVaultHeroBanner(
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
-                            Text("Expiring Soon", color = if (stats.expiringCount > 0) Color(0xFFFCA5A5) else Color(0xFF94A3B8), fontSize = 11.sp)
+                            Text("Expiring Soon".localize(appLanguage), color = if (stats.expiringCount > 0) Color(0xFFFCA5A5) else Color(0xFF94A3B8), fontSize = 11.sp)
                             Text(
-                                text = "${stats.expiringCount} Items",
+                                text = "${stats.expiringCount} " + "Items".localize(appLanguage),
                                 color = if (stats.expiringCount > 0) Color(0xFFFECACA) else Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
@@ -435,7 +438,7 @@ fun ClaimVaultHeroBanner(
                     ) {
                         Icon(Icons.Default.Receipt, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add Item", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text("Add Item".localize(appLanguage), color = Color.Black, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
@@ -449,7 +452,7 @@ fun ClaimVaultHeroBanner(
                     ) {
                         Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color(0xFFA7F3D0), modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Scan Receipt", color = Color(0xFFA7F3D0), fontWeight = FontWeight.Bold)
+                        Text("Scan Receipt".localize(appLanguage), color = Color(0xFFA7F3D0), fontWeight = FontWeight.Bold)
                     }
                 }
             }

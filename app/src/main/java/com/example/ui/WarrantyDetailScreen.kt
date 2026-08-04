@@ -76,6 +76,8 @@ import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.RedAlert
 import com.example.ui.theme.RedAlertContainer
 import com.example.util.getCategoryEmoji
+import com.example.util.AppLanguage
+import com.example.util.localize
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -90,6 +92,7 @@ fun WarrantyDetailScreen(
     onNavigateToEdit: (Long) -> Unit
 ) {
     val context = LocalContext.current
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
     val itemState by viewModel.getWarrantyById(itemId).collectAsStateWithLifecycle(initialValue = null)
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isImageZoomed by remember { mutableStateOf(false) }
@@ -102,13 +105,13 @@ fun WarrantyDetailScreen(
 
     val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.US)
     val purchaseStr = dateFormat.format(Date(item.purchaseDateEpoch))
-    val expiryStr = if (item.warrantyDurationMonths == -1) "Lifetime" else dateFormat.format(Date(item.expiryDateEpoch))
+    val expiryStr = if (item.warrantyDurationMonths == -1) "Lifetime".localize(appLanguage) else dateFormat.format(Date(item.expiryDateEpoch))
 
     val (statusBg, statusFg, statusTitle) = when {
-        item.warrantyDurationMonths == -1 -> Triple(EmeraldLightContainer, EmeraldDark, "LIFETIME COVERAGE")
-        daysLeft < 0 -> Triple(RedAlertContainer, RedAlert, "EXPIRED COVERAGE")
-        daysLeft <= 30 -> Triple(AmberUrgentContainer, AmberUrgent, "EXPIRING SOON ($daysLeft Days Remaining)")
-        else -> Triple(EmeraldLightContainer, EmeraldDark, "ACTIVE COVERAGE ($daysLeft Days Remaining)")
+        item.warrantyDurationMonths == -1 -> Triple(EmeraldLightContainer, EmeraldDark, "LIFETIME COVERAGE".localize(appLanguage))
+        daysLeft < 0 -> Triple(RedAlertContainer, RedAlert, "EXPIRED COVERAGE".localize(appLanguage))
+        daysLeft <= 30 -> Triple(AmberUrgentContainer, AmberUrgent, "EXPIRING SOON".localize(appLanguage) + " ($daysLeft " + "Days Remaining".localize(appLanguage) + ")")
+        else -> Triple(EmeraldLightContainer, EmeraldDark, "ACTIVE COVERAGE".localize(appLanguage) + " ($daysLeft " + "Days Remaining".localize(appLanguage) + ")")
     }
 
     Scaffold(
@@ -120,7 +123,7 @@ fun WarrantyDetailScreen(
                         onClick = onNavigateBack,
                         modifier = Modifier.testTag("back_button")
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back".localize(appLanguage))
                     }
                 },
                 actions = {
@@ -128,13 +131,13 @@ fun WarrantyDetailScreen(
                         onClick = { onNavigateToEdit(item.id) },
                         modifier = Modifier.testTag("edit_warranty_button")
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit")
+                        Icon(Icons.Default.Edit, contentDescription = "Edit".localize(appLanguage))
                     }
                     IconButton(
                         onClick = { showDeleteDialog = true },
                         modifier = Modifier.testTag("delete_warranty_button")
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = RedAlert)
+                        Icon(Icons.Default.Delete, contentDescription = "Delete".localize(appLanguage), tint = RedAlert)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -202,8 +205,8 @@ fun WarrantyDetailScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Purchased $purchaseStr", style = MaterialTheme.typography.labelSmall, color = Color.DarkGray)
-                                Text("Expires $expiryStr", style = MaterialTheme.typography.labelSmall, color = Color.DarkGray, fontWeight = FontWeight.Bold)
+                                Text("Purchased".localize(appLanguage) + " $purchaseStr", style = MaterialTheme.typography.labelSmall, color = Color.DarkGray)
+                                Text("Expires".localize(appLanguage) + " $expiryStr", style = MaterialTheme.typography.labelSmall, color = Color.DarkGray, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -223,7 +226,7 @@ fun WarrantyDetailScreen(
                     ) {
                         Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("EXPORT CLAIM PACKET (PDF / IMAGE BUNDLE)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("EXPORT CLAIM PACKET (PDF / IMAGE BUNDLE)".localize(appLanguage), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
@@ -239,31 +242,68 @@ fun WarrantyDetailScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("PRODUCT & CLAIM DETAILS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+                    Text("PRODUCT & CLAIM DETAILS".localize(appLanguage), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
 
-                    DetailRow(label = "Store / Merchant", value = item.merchant)
-                    DetailRow(label = "Purchase Price", value = "${item.currency}${String.format(Locale.US, "%.2f", item.price)}")
-                    DetailRow(label = "Category", value = item.category)
+                    DetailRow(label = "Store / Merchant".localize(appLanguage), value = item.merchant)
+                    DetailRow(label = "Purchase Price".localize(appLanguage), value = "${item.currency}${String.format(Locale.US, "%.2f", item.price)}")
+                    DetailRow(label = "Category".localize(appLanguage), value = item.category.localize(appLanguage))
                     DetailRow(
-                        label = "Warranty Duration",
-                        value = if (item.warrantyDurationMonths == -1) "Lifetime" else "${item.warrantyDurationMonths} Months"
+                        label = "Warranty Duration".localize(appLanguage),
+                        value = if (item.warrantyDurationMonths == -1) "Lifetime".localize(appLanguage) else "${item.warrantyDurationMonths} " + "Months".localize(appLanguage)
                     )
 
                     // Model & Serial Number with One-Tap Copy
                     if (item.modelNumber.isNotBlank()) {
                         CopyableDetailRow(
                             context = context,
-                            label = "Model Number",
-                            value = item.modelNumber
+                            label = "Model Number".localize(appLanguage),
+                            value = item.modelNumber,
+                            appLanguage = appLanguage
                         )
                     }
 
                     if (item.serialNumber.isNotBlank()) {
                         CopyableDetailRow(
                             context = context,
-                            label = "Serial Number",
-                            value = item.serialNumber
+                            label = "Serial Number".localize(appLanguage),
+                            value = item.serialNumber,
+                            appLanguage = appLanguage
                         )
+                    }
+                }
+            }
+
+            // Custom Tags Card
+            if (item.tags.isNotBlank()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("CUSTOM TAGS".localize(appLanguage), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            item.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { tag ->
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "🏷️ $tag",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -282,16 +322,16 @@ fun WarrantyDetailScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Pre-Expiry Checkup Alerts", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Pre-Expiry Checkup Alerts".localize(appLanguage), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        text = "Schedules local push reminders so you can inspect appliances/electronics for defects before coverage ends.",
+                        text = "Schedules local push reminders so you can inspect appliances/electronics for defects before coverage ends.".localize(appLanguage),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
 
                     ReminderRow(
-                        title = "30 Days Before Expiry",
+                        title = "30 Days Before Expiry".localize(appLanguage),
                         enabled = item.reminder30Days,
                         onToggle = { enabled ->
                             viewModel.saveWarranty(
@@ -308,13 +348,14 @@ fun WarrantyDetailScreen(
                                 notes = item.notes,
                                 reminder30Days = enabled,
                                 reminder7Days = item.reminder7Days,
-                                reminder1Day = item.reminder1Day
+                                reminder1Day = item.reminder1Day,
+                                tags = item.tags
                             )
                         }
                     )
 
                     ReminderRow(
-                        title = "7 Days Before Expiry",
+                        title = "7 Days Before Expiry".localize(appLanguage),
                         enabled = item.reminder7Days,
                         onToggle = { enabled ->
                             viewModel.saveWarranty(
@@ -331,13 +372,14 @@ fun WarrantyDetailScreen(
                                 notes = item.notes,
                                 reminder30Days = item.reminder30Days,
                                 reminder7Days = enabled,
-                                reminder1Day = item.reminder1Day
+                                reminder1Day = item.reminder1Day,
+                                tags = item.tags
                             )
                         }
                     )
 
                     ReminderRow(
-                        title = "1 Day Before Expiry",
+                        title = "1 Day Before Expiry".localize(appLanguage),
                         enabled = item.reminder1Day,
                         onToggle = { enabled ->
                             viewModel.saveWarranty(
@@ -354,7 +396,8 @@ fun WarrantyDetailScreen(
                                 notes = item.notes,
                                 reminder30Days = item.reminder30Days,
                                 reminder7Days = item.reminder7Days,
-                                reminder1Day = enabled
+                                reminder1Day = enabled,
+                                tags = item.tags
                             )
                         }
                     )
@@ -373,7 +416,7 @@ fun WarrantyDetailScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("PROOF OF PURCHASE RECEIPT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+                        Text("PROOF OF PURCHASE RECEIPT".localize(appLanguage), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
 
                         Box(
                             modifier = Modifier
@@ -384,13 +427,13 @@ fun WarrantyDetailScreen(
                         ) {
                             Image(
                                 painter = rememberAsyncImagePainter(File(item.receiptImagePath)),
-                                contentDescription = "Receipt Image",
+                                contentDescription = "Receipt Image".localize(appLanguage),
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
                         }
                         Text(
-                            text = "Tap image to view full size",
+                            text = "Tap image to view full size".localize(appLanguage),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -410,7 +453,7 @@ fun WarrantyDetailScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("NOTES & REPAIR HISTORY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+                        Text("NOTES & REPAIR HISTORY".localize(appLanguage), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
                         Text(text = item.notes, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
@@ -424,8 +467,8 @@ fun WarrantyDetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Warranty?") },
-            text = { Text("Are you sure you want to remove ${item.title} from your ClaimVault? This action cannot be undone.") },
+            title = { Text("Delete Warranty?".localize(appLanguage)) },
+            text = { Text("Are you sure you want to remove".localize(appLanguage) + " ${item.title} " + "from your ClaimVault? This action cannot be undone.".localize(appLanguage)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -434,12 +477,12 @@ fun WarrantyDetailScreen(
                         onNavigateBack()
                     }
                 ) {
-                    Text("Delete", color = RedAlert, fontWeight = FontWeight.Bold)
+                    Text("Delete".localize(appLanguage), color = RedAlert, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
+                    Text("Cancel".localize(appLanguage))
                 }
             }
         )
@@ -458,7 +501,7 @@ fun DetailRow(label: String, value: String) {
 }
 
 @Composable
-fun CopyableDetailRow(context: Context, label: String, value: String) {
+fun CopyableDetailRow(context: Context, label: String, value: String, appLanguage: AppLanguage) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -474,11 +517,11 @@ fun CopyableDetailRow(context: Context, label: String, value: String) {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val clip = ClipData.newPlainText(label, value)
                 clipboard.setPrimaryClip(clip)
-                Toast.makeText(context, "$label copied!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "$label " + "copied!".localize(appLanguage), Toast.LENGTH_SHORT).show()
             },
             modifier = Modifier.testTag("copy_${label.lowercase(Locale.US).replace(" ", "_")}")
         ) {
-            Icon(Icons.Default.ContentCopy, contentDescription = "Copy $label", modifier = Modifier.size(18.dp), tint = EmeraldPrimary)
+            Icon(Icons.Default.ContentCopy, contentDescription = "Copy".localize(appLanguage) + " $label", modifier = Modifier.size(18.dp), tint = EmeraldPrimary)
         }
     }
 }

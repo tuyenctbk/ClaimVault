@@ -11,5 +11,6 @@ data class Receipt(
     val date: Long,
     val totalAmount: Double,
     val imagePath: String? = null,
-    val warrantyExpiryDate: Long
+    val warrantyExpiryDate: Long,
+    val tags: String = ""
 )

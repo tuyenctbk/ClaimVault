@@ -15,6 +15,7 @@ import com.example.util.OcrResult
 import com.example.util.PdfClaimExporter
 import com.example.util.SmartPromptManager
 import com.example.util.ThemeMode
+import com.example.util.AppLanguage
 import com.example.util.ThemePreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,14 @@ data class VaultStats(
     val activeCount: Int
 )
 
+enum class SortOption(val label: String) {
+    NEAREST_EXPIRY("Nearest Expiry"),
+    PURCHASE_DATE_NEWEST("Newest Purchase"),
+    PURCHASE_DATE_OLDEST("Oldest Purchase"),
+    CATEGORY("Category"),
+    TITLE_AZ("Title A-Z")
+}
+
 class ClaimVaultViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = WarrantyRepository.getInstance(application)
@@ -40,19 +49,59 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
     val smartPromptManager = SmartPromptManager(application)
 
     val themeMode: StateFlow<ThemeMode> = themePreferences.themeMode
+    val appLanguage: StateFlow<AppLanguage> = themePreferences.appLanguage
     val hasCompletedOnboarding: StateFlow<Boolean> = themePreferences.hasCompletedOnboarding
+
+    fun setAppLanguage(lang: AppLanguage) {
+        themePreferences.setAppLanguage(lang)
+        FirebaseManager.logEvent("language_changed", mapOf("lang" to lang.name))
+    }
 
     val searchQuery = MutableStateFlow("")
     val selectedCategory = MutableStateFlow("All")
     val selectedStatus = MutableStateFlow("All") // "All", "Expiring Soon", "Active", "Expired"
+    val selectedTag = MutableStateFlow("All")
+    val selectedSort = MutableStateFlow(SortOption.NEAREST_EXPIRY)
+
+    val allWarranties: StateFlow<List<WarrantyItem>> = repository.allWarranties
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val availableTags: StateFlow<List<String>> = allWarranties
+        .map { items ->
+            val tagsSet = mutableSetOf<String>()
+            items.forEach { item ->
+                if (item.tags.isNotBlank()) {
+                    item.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { tagsSet.add(it) }
+                }
+            }
+            listOf("All") + tagsSet.sorted()
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = listOf("All")
+        )
 
     val isScanningOcr = MutableStateFlow(false)
     val lastOcrResult = MutableStateFlow<OcrResult?>(null)
+
+    var scannedReceiptPath: String? = null
+    var scannedMerchant: String? = null
+    var scannedAmount: Double? = null
+    var scannedDateEpoch: Long? = null
+    var scannedCurrency: String? = null
 
     val messageEvent = MutableStateFlow<String?>(null)
 
     init {
         FirebaseManager.init(application)
+        viewModelScope.launch {
+            repository.seedInitialDataIfEmpty()
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -65,32 +114,24 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
         FirebaseManager.logEvent("onboarding_completed")
     }
 
-    val allWarranties: StateFlow<List<WarrantyItem>> = repository.allWarranties
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
     fun getWarrantyById(id: Long): Flow<WarrantyItem?> = repository.getWarrantyById(id)
 
     val filteredWarranties: StateFlow<List<WarrantyItem>> = combine(
-        allWarranties,
-        searchQuery,
-        selectedCategory,
-        selectedStatus
-    ) { items, query, category, status ->
+        combine(allWarranties, searchQuery, selectedCategory) { items, query, cat -> Triple(items, query, cat) },
+        combine(selectedStatus, selectedTag, selectedSort) { status, tag, sort -> Triple(status, tag, sort) }
+    ) { (items, query, category), (status, tag, sort) ->
         val now = System.currentTimeMillis()
         val dayMs = 86400000L
 
-        items.filter { item ->
+        val filtered = items.filter { item ->
             // Query filter
             val matchesQuery = query.isBlank() ||
                     item.title.contains(query, ignoreCase = true) ||
                     item.merchant.contains(query, ignoreCase = true) ||
                     item.modelNumber.contains(query, ignoreCase = true) ||
                     item.serialNumber.contains(query, ignoreCase = true) ||
-                    item.notes.contains(query, ignoreCase = true)
+                    item.notes.contains(query, ignoreCase = true) ||
+                    item.tags.contains(query, ignoreCase = true)
 
             // Category filter
             val matchesCategory = category == "All" || item.category.equals(category, ignoreCase = true)
@@ -104,7 +145,18 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
                 else -> true
             }
 
-            matchesQuery && matchesCategory && matchesStatus
+            // Tag filter
+            val matchesTag = tag == "All" || item.tags.split(",").map { it.trim() }.any { it.equals(tag, ignoreCase = true) }
+
+            matchesQuery && matchesCategory && matchesStatus && matchesTag
+        }
+
+        when (sort) {
+            SortOption.NEAREST_EXPIRY -> filtered.sortedBy { it.expiryDateEpoch }
+            SortOption.PURCHASE_DATE_NEWEST -> filtered.sortedByDescending { it.purchaseDateEpoch }
+            SortOption.PURCHASE_DATE_OLDEST -> filtered.sortedBy { it.purchaseDateEpoch }
+            SortOption.CATEGORY -> filtered.sortedWith(compareBy({ it.category }, { it.title }))
+            SortOption.TITLE_AZ -> filtered.sortedBy { it.title }
         }
     }.stateIn(
         scope = viewModelScope,
@@ -158,7 +210,9 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
         notes: String,
         reminder30Days: Boolean = true,
         reminder7Days: Boolean = true,
-        reminder1Day: Boolean = true
+        reminder1Day: Boolean = true,
+        tags: String = "",
+        currency: String = "$"
     ) {
         viewModelScope.launch {
             val dayMs = 86400000L
@@ -174,6 +228,7 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
                 merchant = merchant,
                 category = category,
                 price = price,
+                currency = currency,
                 purchaseDateEpoch = purchaseDateEpoch,
                 warrantyDurationMonths = warrantyDurationMonths,
                 expiryDateEpoch = calculatedExpiry,
@@ -183,7 +238,8 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
                 notes = notes,
                 reminder30Days = reminder30Days,
                 reminder7Days = reminder7Days,
-                reminder1Day = reminder1Day
+                reminder1Day = reminder1Day,
+                tags = tags
             )
 
             val newId = repository.insert(item)
@@ -216,10 +272,9 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
 
                 // Simulated / Smart Text Extraction
                 val sampleOcrText = "BEST BUY Store #481\nDate: 08/10/2024\nApple AirPods Max\nTotal: $549.00\nS/N: AP-9921-MAX"
-                val parsed = OcrHelper.parseReceiptText(sampleOcrText)
+                val parsed = OcrHelper.parseReceiptText(sampleOcrText, context)
                 lastOcrResult.value = parsed
 
-                smartPromptManager.onOcrSuccess()
                 onComplete(imagePath, parsed)
             } catch (e: Exception) {
                 messageEvent.value = "Failed to process receipt photo: ${e.localizedMessage}"
@@ -235,7 +290,6 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
             try {
                 val pdfFile = PdfClaimExporter.generateClaimPdf(context, item)
                 PdfClaimExporter.shareClaimPdf(context, pdfFile)
-                smartPromptManager.onPdfExportSuccess()
             } catch (e: Exception) {
                 messageEvent.value = "Error generating claim PDF: ${e.localizedMessage}"
             }
@@ -260,6 +314,36 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
                 messageEvent.value = "Restored $count warranties successfully!"
             } catch (e: Exception) {
                 messageEvent.value = "Restore failed: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun exportEncryptedBackup(context: Context, passphrase: String) {
+        viewModelScope.launch {
+            try {
+                if (passphrase.isBlank()) {
+                    messageEvent.value = "Encryption passphrase cannot be empty"
+                    return@launch
+                }
+                val file = BackupRestoreUtil.exportEncryptedBackup(context, repository, passphrase)
+                messageEvent.value = "Encrypted backup saved: ${file.name}"
+            } catch (e: Exception) {
+                messageEvent.value = "Encrypted backup failed: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun importEncryptedBackup(context: Context, uri: Uri, passphrase: String) {
+        viewModelScope.launch {
+            try {
+                if (passphrase.isBlank()) {
+                    messageEvent.value = "Passphrase cannot be empty"
+                    return@launch
+                }
+                val count = BackupRestoreUtil.importEncryptedBackup(context, uri, repository, passphrase)
+                messageEvent.value = "Restored $count encrypted items successfully!"
+            } catch (e: Exception) {
+                messageEvent.value = "Encrypted restore failed (incorrect password?): ${e.localizedMessage}"
             }
         }
     }

@@ -2,11 +2,14 @@ package com.example.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,16 +20,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoubleArrow
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -39,15 +41,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -57,10 +56,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.ClaimVaultLogo
 import com.example.ui.theme.EmeraldDark
-import com.example.ui.theme.EmeraldLightContainer
 import com.example.ui.theme.EmeraldPrimary
+import com.example.util.AppLanguage
+import com.example.util.localize
 import kotlinx.coroutines.launch
 
 data class OnboardingPage(
@@ -80,9 +81,12 @@ enum class IllustrationType {
 
 @Composable
 fun OnboardingScreen(
+    viewModel: ClaimVaultViewModel,
     onComplete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
+
     val pages = remember {
         listOf(
             OnboardingPage(
@@ -129,105 +133,211 @@ fun OnboardingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // App branding header
+            // App branding header with Language switcher
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)
             ) {
-                ClaimVaultLogo(sizeDp = 32)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "ClaimVault",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ClaimVaultLogo(sizeDp = 32)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "ClaimVault",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+
+                // Interactive Language Selector Badge
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable {
+                            val nextLang = if (appLanguage == AppLanguage.EN) AppLanguage.VI else AppLanguage.EN
+                            viewModel.setAppLanguage(nextLang)
+                        }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (appLanguage == AppLanguage.EN) "🇺🇸 EN" else "🇻🇳 VI",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
-            // Main swipeable layout content
-            Box(
+            // Main swipeable layout content (ADAPTIVE based on constraints)
+            BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
-                    .widthIn(max = 520.dp)
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
+                val isWide = maxWidth >= 600.dp || maxHeight < 550.dp
+                val containerHeight = maxHeight
+
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxWidth()
                 ) { targetPage ->
                     val page = pages[targetPage]
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp)
-                    ) {
-                        // High-fidelity illustration panel
-                        Box(
+                    
+                    if (isWide) {
+                        // Landscape / Tablet Side-by-Side Adaptive Layout
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(220.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(horizontal = 16.dp)
+                                .verticalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            OnboardingIllustration(
-                                type = page.illustrationType,
-                                accentColor = page.colorAccent
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // Subtitle badge
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(page.colorAccent.copy(alpha = 0.15f))
-                                .padding(horizontal = 14.dp, vertical = 6.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = page.primaryIcon,
-                                    contentDescription = null,
-                                    tint = page.colorAccent,
-                                    modifier = Modifier.size(16.dp)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1.1f)
+                                    .height(if (containerHeight < 400.dp) 130.dp else 180.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                OnboardingIllustration(
+                                    type = page.illustrationType,
+                                    accentColor = page.colorAccent,
+                                    modifier = Modifier.fillMaxSize()
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            
+                            Column(
+                                modifier = Modifier.weight(1.3f),
+                                horizontalAlignment = Alignment.Start,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                // Subtitle badge
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(page.colorAccent.copy(alpha = 0.15f))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = page.primaryIcon,
+                                            contentDescription = null,
+                                            tint = page.colorAccent,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = page.subtitle.localize(appLanguage),
+                                            color = page.colorAccent,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Main title
                                 Text(
-                                    text = page.subtitle,
-                                    color = page.colorAccent,
+                                    text = page.title.localize(appLanguage),
+                                    style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                    textAlign = TextAlign.Start,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Narrative description
+                                Text(
+                                    text = page.description.localize(appLanguage),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
+                                    textAlign = TextAlign.Start,
+                                    lineHeight = 20.sp
                                 )
                             }
                         }
+                    } else {
+                        // Standard portrait layout: Column (with adaptive illustration/spacing)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 8.dp)
+                        ) {
+                            // Adaptive illustration size
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(if (containerHeight < 650.dp) 150.dp else 200.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                OnboardingIllustration(
+                                    type = page.illustrationType,
+                                    accentColor = page.colorAccent
+                                )
+                            }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(if (containerHeight < 650.dp) 12.dp else 24.dp))
 
-                        // Main title
-                        Text(
-                            text = page.title,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
+                            // Subtitle badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(page.colorAccent.copy(alpha = 0.15f))
+                                    .padding(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = page.primaryIcon,
+                                        contentDescription = null,
+                                        tint = page.colorAccent,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = page.subtitle.localize(appLanguage),
+                                        color = page.colorAccent,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                        // Narrative description
-                        Text(
-                            text = page.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 22.sp,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
+                            // Main title
+                            Text(
+                                text = page.title.localize(appLanguage),
+                                style = if (containerHeight < 650.dp) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Narrative description
+                            Text(
+                                text = page.description.localize(appLanguage),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
+                                textAlign = TextAlign.Center,
+                                lineHeight = 22.sp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -243,7 +353,7 @@ fun OnboardingScreen(
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 ) {
                     pages.forEachIndexed { index, _ ->
                         val isSelected = index == currentPageIndex
@@ -274,7 +384,7 @@ fun OnboardingScreen(
                             modifier = Modifier.testTag("onboarding_skip_button")
                         ) {
                             Text(
-                                "Skip",
+                                text = "Skip".localize(appLanguage),
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
                         }
@@ -307,7 +417,7 @@ fun OnboardingScreen(
                             modifier = Modifier.padding(horizontal = 12.dp)
                         ) {
                             Text(
-                                text = if (currentPageIndex == pages.lastIndex) "Get Started" else "Next",
+                                text = if (currentPageIndex == pages.lastIndex) "Get Started".localize(appLanguage) else "Next".localize(appLanguage),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
                             )

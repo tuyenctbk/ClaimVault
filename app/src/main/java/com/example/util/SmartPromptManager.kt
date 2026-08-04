@@ -32,54 +32,27 @@ class SmartPromptManager(private val context: Context) {
 
         FirebaseManager.logEvent("item_saved_count", mapOf("count" to count))
 
-        // Check if smart prompts should trigger
-        checkDynamicTriggers()
-    }
-
-    fun onOcrSuccess() {
-        val count = prefs.getInt("ocr_success_count", 0) + 1
-        prefs.edit().putInt("ocr_success_count", count).apply()
-        checkDynamicTriggers()
-    }
-
-    fun onPdfExportSuccess() {
-        val count = prefs.getInt("pdf_export_count", 0) + 1
-        prefs.edit().putInt("pdf_export_count", count).apply()
-        checkDynamicTriggers()
-    }
-
-    private fun checkDynamicTriggers() {
+        // Check if smart rate dialog should trigger automatically (e.g. at 2nd saved item)
         if (shouldAutoShowRating()) {
             _showRateDialog.value = true
-        } else if (shouldAutoShowShare()) {
+        } else if (shouldAutoShowShare() && count == 3) {
             _showShareDialog.value = true
         }
-    }
-
-    private fun getSatisfactionScore(): Int {
-        val savedItems = prefs.getInt("saved_items_count", 0)
-        val ocrSuccess = prefs.getInt("ocr_success_count", 0)
-        val pdfExports = prefs.getInt("pdf_export_count", 0)
-
-        // Calculate score: 1pt per save, 2pt per OCR, 5pt per PDF export
-        return (savedItems * 1) + (ocrSuccess * 2) + (pdfExports * 5)
     }
 
     fun shouldAutoShowRating(): Boolean {
         val hasRated = prefs.getBoolean("has_rated_app", false)
         val neverShow = prefs.getBoolean("never_show_rating", false)
+        val count = prefs.getInt("saved_items_count", 0)
         val launches = prefs.getInt("app_launch_count", 0)
-        val score = getSatisfactionScore()
 
-        // Trigger when satisfaction score is high (>= 10) and user has explored the app (>= 3 launches)
-        return !hasRated && !neverShow && score >= 10 && launches >= 3
+        return !hasRated && !neverShow && (count >= 2 || launches >= 4)
     }
 
     fun shouldAutoShowShare(): Boolean {
         val hasShared = prefs.getBoolean("has_shared_app", false)
-        val score = getSatisfactionScore()
-        // Trigger share suggestion at higher satisfaction
-        return !hasShared && score >= 15
+        val count = prefs.getInt("saved_items_count", 0)
+        return !hasShared && count >= 3
     }
 
     fun triggerRateDialog() {

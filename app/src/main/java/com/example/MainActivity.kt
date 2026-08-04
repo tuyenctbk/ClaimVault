@@ -20,7 +20,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.ui.AddEditWarrantyScreen
+import com.example.ui.CameraScanScreen
 import com.example.ui.ClaimVaultViewModel
+import com.example.ui.DashboardScreen
 import com.example.ui.HomeScreen
 import com.example.ui.OnboardingScreen
 import com.example.ui.SettingsScreen
@@ -99,6 +101,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         composable("onboarding") {
                             OnboardingScreen(
+                                viewModel = viewModel,
                                 onComplete = {
                                     viewModel.completeOnboarding()
                                     navController.navigate("home") {
@@ -113,7 +116,15 @@ class MainActivity : ComponentActivity() {
                                 viewModel = viewModel,
                                 onNavigateToAdd = { navController.navigate("add_edit") },
                                 onNavigateToDetail = { id -> navController.navigate("detail/$id") },
-                                onNavigateToSettings = { navController.navigate("settings") }
+                                onNavigateToSettings = { navController.navigate("settings") },
+                                onNavigateToDashboard = { navController.navigate("dashboard") }
+                            )
+                        }
+
+                        composable("dashboard") {
+                            DashboardScreen(
+                                viewModel = viewModel,
+                                onNavigateBack = { navController.popBackStack() }
                             )
                         }
 
@@ -130,6 +141,22 @@ class MainActivity : ComponentActivity() {
                             AddEditWarrantyScreen(
                                 viewModel = viewModel,
                                 editingItemId = if (itemId > 0L) itemId else null,
+                                onNavigateBack = { navController.popBackStack() },
+                                onNavigateToCameraScan = { navController.navigate("camera_scan") }
+                            )
+                        }
+
+                        composable("camera_scan") {
+                            CameraScanScreen(
+                                viewModel = viewModel,
+                                onScanComplete = { path, merchant, amount, dateEpoch, currency ->
+                                    viewModel.scannedReceiptPath = path
+                                    viewModel.scannedMerchant = merchant
+                                    viewModel.scannedAmount = amount
+                                    viewModel.scannedDateEpoch = dateEpoch
+                                    viewModel.scannedCurrency = currency
+                                    navController.popBackStack()
+                                },
                                 onNavigateBack = { navController.popBackStack() }
                             )
                         }

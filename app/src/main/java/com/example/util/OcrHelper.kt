@@ -22,6 +22,7 @@ data class OcrResult(
     val merchant: String?,
     val totalAmount: Double?,
     val purchaseDateEpoch: Long?,
+    val currency: String,
     val rawText: String
 )
 
@@ -112,12 +113,13 @@ object OcrHelper {
     }
 
     /**
-     * Local pattern extractor for simulated / smart fallback OCR text parsing.
+     * Local pattern extractor for simulated / smart fallback OCR text parsing with currency auto-detection and locale fallback.
      */
-    fun parseReceiptText(text: String): OcrResult {
+    fun parseReceiptText(text: String, context: Context? = null): OcrResult {
         var merchant: String? = null
         var totalAmount: Double? = null
         var dateEpoch: Long? = null
+        var detectedCurrency: String? = null
 
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
 
@@ -139,8 +141,45 @@ object OcrHelper {
             merchant = lines.firstOrNull { it.length in 3..25 && !it.contains("receipt", ignoreCase = true) }
         }
 
+        // Auto-detect currency symbol or code
+        val currencyMap = mapOf(
+            "USD" to "$", "EUR" to "€", "GBP" to "£", "JPY" to "¥", "INR" to "₹",
+            "CAD" to "CA$", "AUD" to "AU$", "CHF" to "CHF", "CNY" to "¥", "BRL" to "R$",
+            "SEK" to "kr", "NOK" to "kr", "DKK" to "kr", "ZAR" to "R"
+        )
+        for ((code, sym) in currencyMap) {
+            if (text.contains(code, ignoreCase = true) || text.contains(sym)) {
+                detectedCurrency = sym
+                break
+            }
+        }
+
+        if (detectedCurrency == null) {
+            if (text.contains("$")) detectedCurrency = "$"
+            else if (text.contains("€")) detectedCurrency = "€"
+            else if (text.contains("£")) detectedCurrency = "£"
+            else if (text.contains("¥")) detectedCurrency = "¥"
+            else if (text.contains("₹")) detectedCurrency = "₹"
+            else if (text.contains("kr", ignoreCase = true)) detectedCurrency = "kr"
+        }
+
+        // Default to device's locale setting if not found in text
+        if (detectedCurrency == null) {
+            detectedCurrency = try {
+                val locale = if (context != null) {
+                    context.resources.configuration.locales[0]
+                } else {
+                    Locale.getDefault()
+                }
+                val curr = java.util.Currency.getInstance(locale)
+                curr?.symbol ?: "$"
+            } catch (e: Exception) {
+                "$"
+            }
+        }
+
         // Price regex (e.g. $199.99, TOTAL: 199.99)
-        val pricePattern = Pattern.compile("(?:TOTAL|AMT|AMOUNT|BAL)?\\s*\\$?(\\d{1,4}\\.\\d{2})", Pattern.CASE_INSENSITIVE)
+        val pricePattern = Pattern.compile("(?:TOTAL|AMT|AMOUNT|BAL)?\\s*[$€£¥₹]?\\s*(\\d{1,4}\\.\\d{2})", Pattern.CASE_INSENSITIVE)
         val priceMatcher = pricePattern.matcher(text)
         var maxFoundPrice = 0.0
 
@@ -170,6 +209,7 @@ object OcrHelper {
             merchant = merchant,
             totalAmount = totalAmount,
             purchaseDateEpoch = dateEpoch,
+            currency = detectedCurrency,
             rawText = text
         )
     }

@@ -1,5 +1,4 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
-import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -10,13 +9,6 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
-val localProperties = Properties().apply {
-  val localPropertiesFile = rootProject.file("local.properties")
-  if (localPropertiesFile.exists()) {
-    localPropertiesFile.inputStream().use { load(it) }
-  }
-}
-
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -25,18 +17,19 @@ android {
     applicationId = "com.soloprono.claimvault"
     minSdk = 24
     targetSdk = 36
-    versionCode = 2
-    versionName = "1.1"
+    versionCode = 6
+    versionName = "1.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
     create("release") {
-      storeFile = rootProject.file("common_release_key.jks")
-      storePassword = localProperties.getProperty("release.storePassword") ?: System.getenv("STORE_PASSWORD")
-      keyAlias = localProperties.getProperty("release.keyAlias") ?: "upload"
-      keyPassword = localProperties.getProperty("release.keyPassword") ?: System.getenv("KEY_PASSWORD")
+      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      storeFile = file(keystorePath)
+      storePassword = System.getenv("STORE_PASSWORD")
+      keyAlias = "upload"
+      keyPassword = System.getenv("KEY_PASSWORD")
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -82,10 +75,11 @@ dependencies {
   implementation(platform(libs.firebase.bom))
   implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
-  // implementation(libs.androidx.camera.camera2)
-  // implementation(libs.androidx.camera.core)
-  // implementation(libs.androidx.camera.lifecycle)
-  // implementation(libs.androidx.camera.view)
+  implementation(libs.androidx.camera.camera2)
+  implementation(libs.androidx.camera.core)
+  implementation(libs.androidx.camera.lifecycle)
+  implementation(libs.androidx.camera.view)
+  implementation("com.google.mlkit:text-recognition:16.0.0")
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)

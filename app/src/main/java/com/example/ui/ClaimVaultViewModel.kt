@@ -99,9 +99,6 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         FirebaseManager.init(application)
-        viewModelScope.launch {
-            repository.seedInitialDataIfEmpty()
-        }
     }
 
     fun setThemeMode(mode: ThemeMode) {

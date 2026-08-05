@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -9,6 +10,13 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+val localProperties = Properties().apply {
+  val localPropertiesFile = rootProject.file("local.properties")
+  if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { load(it) }
+  }
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -17,25 +25,18 @@ android {
     applicationId = "com.soloprono.claimvault"
     minSdk = 24
     targetSdk = 36
-    versionCode = 6
-    versionName = "1.3"
+    versionCode = 12
+    versionName = "1.4.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+      storeFile = rootProject.file("common_release_key.jks")
+      storePassword = localProperties.getProperty("release.storePassword") ?: System.getenv("STORE_PASSWORD")
+      keyAlias = localProperties.getProperty("release.keyAlias") ?: "upload"
+      keyPassword = localProperties.getProperty("release.keyPassword") ?: System.getenv("KEY_PASSWORD")
     }
   }
 
@@ -46,7 +47,9 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      // Default signing is used for debug builds
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -56,6 +59,13 @@ android {
     compose = true
     buildConfig = true
   }
+
+  packaging {
+    jniLibs {
+      useLegacyPackaging = false
+    }
+  }
+
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 

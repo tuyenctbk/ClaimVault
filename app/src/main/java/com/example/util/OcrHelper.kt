@@ -23,7 +23,8 @@ data class OcrResult(
     val totalAmount: Double?,
     val purchaseDateEpoch: Long?,
     val currency: String,
-    val rawText: String
+    val rawText: String,
+    val suggestedCategory: String = "Electronics"
 )
 
 object OcrHelper {
@@ -205,13 +206,107 @@ object OcrHelper {
             }
         }
 
+        val suggestedCategory = detectCategory(merchant, text, totalAmount)
+
         return OcrResult(
             merchant = merchant,
             totalAmount = totalAmount,
             purchaseDateEpoch = dateEpoch,
             currency = detectedCurrency,
-            rawText = text
+            rawText = text,
+            suggestedCategory = suggestedCategory
         )
+    }
+
+    /**
+     * Infer the best matching category from merchant names, receipt keywords, and price heuristics.
+     */
+    fun detectCategory(merchant: String?, rawText: String, totalAmount: Double?): String {
+        val lowerMerchant = (merchant ?: "").lowercase(Locale.US)
+        val lowerText = rawText.lowercase(Locale.US)
+
+        // 1. Merchant-specific mapping
+        when {
+            lowerMerchant.contains("apple") || lowerMerchant.contains("best buy") ||
+            lowerMerchant.contains("micro center") || lowerMerchant.contains("b&h") ||
+            lowerMerchant.contains("sony") || lowerMerchant.contains("dell") ||
+            lowerMerchant.contains("lenovo") || lowerMerchant.contains("samsung") -> return "Electronics"
+
+            lowerMerchant.contains("dyson") || lowerMerchant.contains("whirlpool") ||
+            lowerMerchant.contains("kitchenaid") || lowerMerchant.contains("breville") ||
+            lowerMerchant.contains("nespresso") || lowerMerchant.contains("ge appliances") -> return "Appliances"
+
+            lowerMerchant.contains("home depot") || lowerMerchant.contains("lowe") ||
+            lowerMerchant.contains("ace hardware") || lowerMerchant.contains("harbor freight") -> return "Tools"
+
+            lowerMerchant.contains("ikea") || lowerMerchant.contains("ashley") ||
+            lowerMerchant.contains("pottery barn") || lowerMerchant.contains("west elm") ||
+            lowerMerchant.contains("wayfair") || lowerMerchant.contains("cb2") -> return "Furniture"
+
+            lowerMerchant.contains("autozone") || lowerMerchant.contains("o'reilly") ||
+            lowerMerchant.contains("advance auto") || lowerMerchant.contains("pep boys") ||
+            lowerMerchant.contains("firestone") || lowerMerchant.contains("jiffy lube") -> return "Automotive"
+
+            lowerMerchant.contains("nike") || lowerMerchant.contains("adidas") ||
+            lowerMerchant.contains("zara") || lowerMerchant.contains("h&m") ||
+            lowerMerchant.contains("nordstrom") || lowerMerchant.contains("sephora") ||
+            lowerMerchant.contains("gap") || lowerMerchant.contains("uniqlo") -> return "Fashion"
+
+            lowerMerchant.contains("bed bath") || lowerMerchant.contains("target") ||
+            lowerMerchant.contains("walmart") || lowerMerchant.contains("costco") -> {
+                // If big box store, analyze keywords or amount
+            }
+        }
+
+        // 2. Keyword-based matching in OCR content
+        when {
+            lowerText.contains("laptop") || lowerText.contains("phone") || lowerText.contains("macbook") ||
+            lowerText.contains("iphone") || lowerText.contains("ipad") || lowerText.contains("headphone") ||
+            lowerText.contains("earbuds") || lowerText.contains("tv") || lowerText.contains("oled") ||
+            lowerText.contains("monitor") || lowerText.contains("camera") || lowerText.contains("gpu") ||
+            lowerText.contains("airpods") || lowerText.contains("tablet") || lowerText.contains("bluetooth") -> return "Electronics"
+
+            lowerText.contains("refrigerator") || lowerText.contains("fridge") || lowerText.contains("washer") ||
+            lowerText.contains("dryer") || lowerText.contains("microwave") || lowerText.contains("vacuum") ||
+            lowerText.contains("dishwasher") || lowerText.contains("air purifier") || lowerText.contains("blender") ||
+            lowerText.contains("coffee maker") || lowerText.contains("toaster") -> return "Appliances"
+
+            lowerText.contains("drill") || lowerText.contains("saw") || lowerText.contains("wrench") ||
+            lowerText.contains("screwdriver") || lowerText.contains("socket") || lowerText.contains("toolkit") ||
+            lowerText.contains("hammer") || lowerText.contains("ladder") || lowerText.contains("generator") -> return "Tools"
+
+            lowerText.contains("sofa") || lowerText.contains("chair") || lowerText.contains("desk") ||
+            lowerText.contains("table") || lowerText.contains("mattress") || lowerText.contains("cabinet") ||
+            lowerText.contains("bookshelf") || lowerText.contains("recliner") -> return "Furniture"
+
+            lowerText.contains("tire") || lowerText.contains("brake") || lowerText.contains("motor oil") ||
+            lowerText.contains("battery") || lowerText.contains("windshield") || lowerText.contains("car wash") ||
+            lowerText.contains("mechanic") || lowerText.contains("transmission") -> return "Automotive"
+
+            lowerText.contains("shoe") || lowerText.contains("sneaker") || lowerText.contains("jacket") ||
+            lowerText.contains("shirt") || lowerText.contains("pants") || lowerText.contains("dress") ||
+            lowerText.contains("hoodie") || lowerText.contains("perfume") || lowerText.contains("cosmetic") -> return "Fashion"
+
+            lowerText.contains("cookware") || lowerText.contains("pan") || lowerText.contains("pot") ||
+            lowerText.contains("knife") || lowerText.contains("pillow") || lowerText.contains("blanket") ||
+            lowerText.contains("plate") || lowerText.contains("dinnerware") -> return "Home & Kitchen"
+        }
+
+        // 3. Amount-based heuristic fallback
+        if (totalAmount != null) {
+            if (totalAmount >= 400.0) {
+                // High-value purchases are usually electronics or major appliances
+                return "Electronics"
+            } else if (totalAmount in 150.0..399.99) {
+                return "Appliances"
+            } else if (totalAmount in 40.0..149.99) {
+                return "Home & Kitchen"
+            } else {
+                return "Electronics"
+            }
+        }
+
+        return "Electronics"
     }
 
     private fun parseDateToEpoch(dateStr: String): Long? {

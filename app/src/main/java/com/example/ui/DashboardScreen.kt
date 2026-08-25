@@ -82,8 +82,9 @@ fun DashboardScreen(
         Color(0xFF10B981)  // Teal
     )
 
-    // Monthly spending (last 6 months)
+    // Monthly spending & receipt counts (last 6 months)
     val monthlyData = mutableMapOf<String, Double>()
+    val monthlyCounts = mutableMapOf<String, Int>()
     val dateFormat = SimpleDateFormat("MMM yyyy", Locale.US)
     val monthKeyFormat = SimpleDateFormat("yyyy-MM", Locale.US)
 
@@ -97,6 +98,7 @@ fun DashboardScreen(
         monthKeys.add(key)
         monthLabels.add(label)
         monthlyData[key] = 0.0
+        monthlyCounts[key] = 0
     }
 
     allWarranties.forEach { item ->
@@ -104,11 +106,15 @@ fun DashboardScreen(
         val key = monthKeyFormat.format(itemCal.time)
         if (monthlyData.containsKey(key)) {
             monthlyData[key] = (monthlyData[key] ?: 0.0) + item.price
+            monthlyCounts[key] = (monthlyCounts[key] ?: 0) + 1
         }
     }
 
     val monthlyValues = monthKeys.map { monthlyData[it] ?: 0.0 }
     val maxMonthlyValue = (monthlyValues.maxOrNull() ?: 1.0).let { if (it == 0.0) 1.0 else it }
+
+    val monthlyCountValues = monthKeys.map { monthlyCounts[it] ?: 0 }
+    val maxMonthlyCount = (monthlyCountValues.maxOrNull() ?: 1).let { if (it == 0) 1 else it }
 
     Scaffold(
         topBar = {
@@ -375,7 +381,8 @@ fun DashboardScreen(
                                     categoryEntries.forEachIndexed { index, entry ->
                                         val catName = entry.key
                                         val count = entry.value.size
-                                        val percentage = (count / totalItemsCount) * 100
+                                        val catSpending = entry.value.sumOf { it.price }
+                                        val percentage = if (totalSpending > 0) (catSpending / totalSpending) * 100 else (count / totalItemsCount) * 100
                                         val color = categoryColors[index % categoryColors.size]
                                         val emoji = getCategoryEmoji(catName)
 
@@ -397,13 +404,108 @@ fun DashboardScreen(
                                                 modifier = Modifier.weight(1f)
                                             )
                                             Text(
-                                                text = "$count (${String.format(Locale.US, "%.0f", percentage)}%)",
+                                                text = "$${String.format(Locale.US, "%.0f", catSpending)} (${String.format(Locale.US, "%.0f", percentage)}%)",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // RECEIPT COUNT DISTRIBUTION OVER TIME CARD
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("receipt_count_chart_card"),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.BarChart, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Receipt Volume Distribution Over Time".localize(appLanguage), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            "Number of scanned purchase receipts added over the last 6 months".localize(appLanguage),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .padding(horizontal = 8.dp)
+                                .testTag("receipt_count_bar_chart"),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            val barColor = Color(0xFF3B82F6) // Blue accent
+                            val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                            val bottomOffsetPx = with(density) { 24.dp.toPx() }
+
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val width = size.width
+                                val height = size.height - bottomOffsetPx
+                                val barWidth = (width / monthlyCountValues.size) * 0.45f
+                                val spacing = (width / monthlyCountValues.size)
+
+                                for (i in 0..3) {
+                                    val y = (height / 3) * i
+                                    drawLine(
+                                        color = gridColor,
+                                        start = Offset(0f, y),
+                                        end = Offset(width, y),
+                                        strokeWidth = 1f
+                                    )
+                                }
+
+                                monthlyCountValues.forEachIndexed { index, value ->
+                                    val barHeight = (value.toFloat() / maxMonthlyCount.toFloat()) * height
+                                    val left = index * spacing + (spacing - barWidth) / 2
+                                    val top = height - barHeight
+
+                                    drawRoundRect(
+                                        color = barColor,
+                                        topLeft = Offset(left, top),
+                                        size = Size(barWidth, barHeight),
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f)
+                                    )
+                                }
+                            }
+                        }
+
+                        // X-Axis Labels & Counts
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            monthLabels.forEachIndexed { idx, label ->
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "${monthlyCountValues[idx]}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EmeraldPrimary
+                                    )
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                    )
                                 }
                             }
                         }

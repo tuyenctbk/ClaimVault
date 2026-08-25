@@ -54,7 +54,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -93,8 +97,9 @@ fun SettingsScreen(
     val allWarranties by viewModel.allWarranties.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
+    val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsStateWithLifecycle()
 
-    // Backup File Import Launcher
+    // Backup File Import Launcher (JSON)
     val importBackupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -103,7 +108,17 @@ fun SettingsScreen(
         }
     }
 
+    // CSV File Import Launcher
+    val importCsvLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.importBackupCsv(context, it)
+        }
+    }
+
     var backupPassphrase by remember { mutableStateOf("ClaimVaultSecure2026") }
+    var cloudSyncKey by remember { mutableStateOf("my_claimvault_sync_key") }
 
     val importEncryptedLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -257,6 +272,111 @@ fun SettingsScreen(
                 }
             }
 
+            // BIOMETRIC SECURITY CARD
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("biometric_security_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, if (isBiometricEnabled) EmeraldPrimary else MaterialTheme.colorScheme.outline)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Fingerprint, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Biometric App Lock".localize(appLanguage), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
+
+                        Switch(
+                            checked = isBiometricEnabled,
+                            onCheckedChange = { enabled ->
+                                viewModel.setBiometricEnabled(enabled)
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = EmeraldPrimary),
+                            modifier = Modifier.testTag("biometric_toggle_switch")
+                        )
+                    }
+
+                    Text(
+                        text = "Require fingerprint or facial recognition before launching ClaimVault to protect your purchase receipts and warranties.".localize(appLanguage),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            // FIRESTORE ENCRYPTED CLOUD SYNC CARD
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("firestore_cloud_sync_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldPrimary)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CloudSync, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Firebase Firestore Cloud Sync".localize(appLanguage), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+
+                    Text(
+                        text = "Sync your receipts & warranties securely across devices using AES-256 zero-knowledge encryption stored in Firebase Firestore.".localize(appLanguage),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+
+                    OutlinedTextField(
+                        value = cloudSyncKey,
+                        onValueChange = { cloudSyncKey = it },
+                        label = { Text("Cloud Sync Key (Device ID)".localize(appLanguage)) },
+                        leadingIcon = { Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("cloud_sync_key_input"),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.backupToFirestore(cloudSyncKey, backupPassphrase) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("firestore_backup_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary, contentColor = Color.Black)
+                        ) {
+                            Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Cloud Sync".localize(appLanguage), fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.restoreFromFirestore(cloudSyncKey, backupPassphrase) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("firestore_restore_button")
+                        ) {
+                            Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Cloud Restore".localize(appLanguage))
+                        }
+                    }
+                }
+            }
+
             // RATE & SHARE CARD
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -347,18 +467,19 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "ENCRYPTED LOCAL BACKUP".localize(appLanguage),
+                        text = "EXPORT & IMPORT (JSON / CSV)".localize(appLanguage),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
-                        text = "Export your entire vault into an uncompressed JSON backup file to transfer to a new phone or archive safely.".localize(appLanguage),
+                        text = "Export your receipts and warranties into JSON or CSV spreadsheet format to share, store, or open in Excel.".localize(appLanguage),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
 
+                    // JSON Actions
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -372,7 +493,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Export Backup".localize(appLanguage), fontWeight = FontWeight.Bold)
+                            Text("Export JSON".localize(appLanguage), fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
@@ -383,7 +504,36 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Restore Backup".localize(appLanguage))
+                            Text("Import JSON".localize(appLanguage))
+                        }
+                    }
+
+                    // CSV Actions
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.exportBackupCsv(context) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("export_csv_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary, contentColor = Color.Black)
+                        ) {
+                            Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Export CSV".localize(appLanguage), fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { importCsvLauncher.launch("*/*") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("import_csv_button")
+                        ) {
+                            Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Import CSV".localize(appLanguage))
                         }
                     }
                 }

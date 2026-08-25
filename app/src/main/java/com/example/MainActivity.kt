@@ -33,7 +33,31 @@ import com.example.ui.theme.MyApplicationTheme
 import com.example.util.FirebaseManager
 import com.example.util.ThemeMode
 
-class MainActivity : ComponentActivity() {
+import androidx.fragment.app.FragmentActivity
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.example.ui.theme.EmeraldPrimary
+import com.example.util.BiometricAuthManager
+
+class MainActivity : FragmentActivity() {
 
     private val viewModel: ClaimVaultViewModel by viewModels()
 
@@ -41,20 +65,91 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Enqueue background WorkManager task to check for 30-day warranty expiries
+        com.example.notification.WarrantyExpiryWorker.enqueuePeriodicExpiryCheck(applicationContext)
+        com.example.notification.DailyExpiryCheckReceiver.scheduleNextDailyCheck(applicationContext)
+
         val targetItemId = intent.getLongExtra("target_item_id", -1L)
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val hasCompletedOnboarding by viewModel.hasCompletedOnboarding.collectAsStateWithLifecycle()
+            val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsStateWithLifecycle()
             val showRateDialog by viewModel.smartPromptManager.showRateDialog.collectAsStateWithLifecycle()
             val showShareDialog by viewModel.smartPromptManager.showShareDialog.collectAsStateWithLifecycle()
+
+            var isBiometricAuthenticated by remember { mutableStateOf(false) }
+
+            LaunchedEffect(isBiometricEnabled) {
+                if (isBiometricEnabled && !isBiometricAuthenticated) {
+                    BiometricAuthManager.promptBiometricAuth(
+                        activity = this@MainActivity,
+                        title = "Unlock ClaimVault",
+                        subtitle = "Authenticate with Fingerprint or Face ID to view receipts",
+                        onSuccess = {
+                            isBiometricAuthenticated = true
+                        },
+                        onError = { errorMsg ->
+                            Toast.makeText(this@MainActivity, errorMsg, Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+            }
 
             MyApplicationTheme(themeMode = themeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val navController = rememberNavController()
+                    if (isBiometricEnabled && !isBiometricAuthenticated) {
+                        // Locked Biometric Overlay Screen
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Vault Locked",
+                                    tint = EmeraldPrimary,
+                                    modifier = Modifier.size(64.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "ClaimVault is Locked",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Biometric security is enabled to protect sensitive purchase receipts.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                                Spacer(modifier = Modifier.height(24.dp))
+                                Button(
+                                    onClick = {
+                                        BiometricAuthManager.promptBiometricAuth(
+                                            activity = this@MainActivity,
+                                            title = "Unlock ClaimVault",
+                                            subtitle = "Authenticate with Fingerprint or Face ID",
+                                            onSuccess = { isBiometricAuthenticated = true },
+                                            onError = { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show() }
+                                        )
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary, contentColor = Color.Black)
+                                ) {
+                                    Icon(Icons.Default.Fingerprint, contentDescription = null)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Authenticate with Fingerprint / Face ID", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    } else {
+                        val navController = rememberNavController()
 
                     LaunchedEffect(viewModel.messageEvent) {
                         viewModel.messageEvent.collect { msg ->
@@ -149,12 +244,13 @@ class MainActivity : ComponentActivity() {
                         composable("camera_scan") {
                             CameraScanScreen(
                                 viewModel = viewModel,
-                                onScanComplete = { path, merchant, amount, dateEpoch, currency ->
+                                onScanComplete = { path, merchant, amount, dateEpoch, currency, category ->
                                     viewModel.scannedReceiptPath = path
                                     viewModel.scannedMerchant = merchant
                                     viewModel.scannedAmount = amount
                                     viewModel.scannedDateEpoch = dateEpoch
                                     viewModel.scannedCurrency = currency
+                                    viewModel.scannedCategory = category
                                     navController.popBackStack()
                                 },
                                 onNavigateBack = { navController.popBackStack() }
@@ -189,4 +285,5 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
 }

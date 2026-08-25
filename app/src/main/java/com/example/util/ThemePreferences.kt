@@ -14,6 +14,9 @@ enum class ThemeMode {
 
 enum class AppLanguage(val displayName: String) {
     EN("English"),
+    ES("Español"),
+    FR("Français"),
+    DE("Deutsch"),
     VI("Tiếng Việt")
 }
 
@@ -29,6 +32,17 @@ class ThemePreferences(context: Context) {
 
     private val _hasCompletedOnboarding = MutableStateFlow(prefs.getBoolean("has_completed_onboarding", false))
     val hasCompletedOnboarding: StateFlow<Boolean> = _hasCompletedOnboarding.asStateFlow()
+
+    private val _hasCompletedCameraOnboarding = MutableStateFlow(prefs.getBoolean("has_completed_camera_onboarding", false))
+    val hasCompletedCameraOnboarding: StateFlow<Boolean> = _hasCompletedCameraOnboarding.asStateFlow()
+
+    private val _isBiometricEnabled = MutableStateFlow(prefs.getBoolean("is_biometric_enabled", false))
+    val isBiometricEnabled: StateFlow<Boolean> = _isBiometricEnabled.asStateFlow()
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("is_biometric_enabled", enabled).apply()
+        _isBiometricEnabled.value = enabled
+    }
 
     fun getSavedThemeMode(): ThemeMode {
         val modeStr = prefs.getString("theme_mode", ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
@@ -61,5 +75,15 @@ class ThemePreferences(context: Context) {
     fun completeOnboarding() {
         prefs.edit().putBoolean("has_completed_onboarding", true).apply()
         _hasCompletedOnboarding.value = true
+    }
+
+    fun completeCameraOnboarding() {
+        prefs.edit().putBoolean("has_completed_camera_onboarding", true).apply()
+        _hasCompletedCameraOnboarding.value = true
+    }
+
+    fun resetCameraOnboarding() {
+        prefs.edit().putBoolean("has_completed_camera_onboarding", false).apply()
+        _hasCompletedCameraOnboarding.value = false
     }
 }

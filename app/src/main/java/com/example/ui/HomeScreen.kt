@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DirectionsCar
@@ -121,6 +122,9 @@ fun HomeScreen(
     val allWarranties by viewModel.allWarranties.collectAsStateWithLifecycle()
     val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
 
+    var isMultiSelectMode by remember { mutableStateOf(false) }
+    var selectedItemIds by remember { mutableStateOf(emptySet<Long>()) }
+
     val now = System.currentTimeMillis()
     val dayMs = 86400000L
 
@@ -134,39 +138,86 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = "ClaimVault Logo",
-                            tint = EmeraldPrimary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    if (isMultiSelectMode) {
                         Text(
-                            text = "ClaimVault",
+                            text = "${selectedItemIds.size} " + "Selected".localize(appLanguage),
                             fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp
+                            fontSize = 20.sp
                         )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = "ClaimVault Logo",
+                                tint = EmeraldPrimary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "ClaimVault",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    if (isMultiSelectMode) {
+                        IconButton(onClick = {
+                            isMultiSelectMode = false
+                            selectedItemIds = emptySet()
+                        }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Cancel selection")
+                        }
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = onNavigateToDashboard,
-                        modifier = Modifier.testTag("dashboard_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.BarChart,
-                            contentDescription = "Dashboard & Analytics"
-                        )
-                    }
-                    IconButton(
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier.testTag("settings_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings & Privacy"
-                        )
+                    if (isMultiSelectMode) {
+                        IconButton(
+                            onClick = {
+                                val selectedItems = allWarranties.filter { selectedItemIds.contains(it.id) }
+                                viewModel.exportClaimBundlePdf(context, selectedItems)
+                                isMultiSelectMode = false
+                                selectedItemIds = emptySet()
+                            },
+                            enabled = selectedItemIds.isNotEmpty(),
+                            modifier = Modifier.testTag("export_bundle_pdf_top_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PictureAsPdf,
+                                contentDescription = "Export Bundle",
+                                tint = if (selectedItemIds.isNotEmpty()) EmeraldPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = { isMultiSelectMode = true },
+                            modifier = Modifier.testTag("multi_select_toggle_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PictureAsPdf,
+                                contentDescription = "Bundle PDF Claims",
+                                tint = EmeraldPrimary
+                            )
+                        }
+                        IconButton(
+                            onClick = onNavigateToDashboard,
+                            modifier = Modifier.testTag("dashboard_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.BarChart,
+                                contentDescription = "Dashboard & Analytics"
+                            )
+                        }
+                        IconButton(
+                            onClick = onNavigateToSettings,
+                            modifier = Modifier.testTag("settings_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings & Privacy"
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -175,17 +226,37 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onNavigateToAdd,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("SCAN NEW RECEIPT".localize(appLanguage), fontWeight = FontWeight.Bold) },
-                containerColor = EmeraldPrimary,
-                contentColor = Color.Black,
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(bottom = 8.dp)
-                    .testTag("scan_new_receipt_fab")
-            )
+            if (isMultiSelectMode) {
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        val selectedItems = filteredList.filter { selectedItemIds.contains(it.id) }
+                        viewModel.exportClaimBundlePdf(context, selectedItems)
+                        isMultiSelectMode = false
+                        selectedItemIds = emptySet()
+                    },
+                    icon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null) },
+                    text = { Text("BUNDLE & SHARE (${selectedItemIds.size})".localize(appLanguage), fontWeight = FontWeight.Bold) },
+                    containerColor = EmeraldPrimary,
+                    contentColor = Color.Black,
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(bottom = 8.dp)
+                        .testTag("bundle_share_fab"),
+                    expanded = selectedItemIds.isNotEmpty()
+                )
+            } else {
+                ExtendedFloatingActionButton(
+                    onClick = onNavigateToAdd,
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text("SCAN NEW RECEIPT".localize(appLanguage), fontWeight = FontWeight.Bold) },
+                    containerColor = EmeraldPrimary,
+                    contentColor = Color.Black,
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(bottom = 8.dp)
+                        .testTag("scan_new_receipt_fab")
+                )
+            }
         }
     ) { paddingValues ->
         BoxWithConstraints(
@@ -232,18 +303,38 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 Box(modifier = Modifier.weight(1f)) {
+                                    val item = pair[0]
+                                    val isSelected = selectedItemIds.contains(item.id)
                                     ExpiringHighlightCard(
-                                        item = pair[0],
-                                        onExportClaim = { viewModel.exportClaimPdf(context, pair[0]) },
-                                        onClick = { onNavigateToDetail(pair[0].id) }
+                                        item = item,
+                                        isMultiSelectMode = isMultiSelectMode,
+                                        isSelected = isSelected,
+                                        onExportClaim = { viewModel.exportClaimPdf(context, item) },
+                                        onClick = {
+                                            if (isMultiSelectMode) {
+                                                selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
+                                            } else {
+                                                onNavigateToDetail(item.id)
+                                            }
+                                        }
                                     )
                                 }
                                 if (pair.size > 1) {
                                     Box(modifier = Modifier.weight(1f)) {
+                                        val item = pair[1]
+                                        val isSelected = selectedItemIds.contains(item.id)
                                         ExpiringHighlightCard(
-                                            item = pair[1],
-                                            onExportClaim = { viewModel.exportClaimPdf(context, pair[1]) },
-                                            onClick = { onNavigateToDetail(pair[1].id) }
+                                            item = item,
+                                            isMultiSelectMode = isMultiSelectMode,
+                                            isSelected = isSelected,
+                                            onExportClaim = { viewModel.exportClaimPdf(context, item) },
+                                            onClick = {
+                                                if (isMultiSelectMode) {
+                                                    selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
+                                                } else {
+                                                    onNavigateToDetail(item.id)
+                                                }
+                                            }
                                         )
                                     }
                                 } else {
@@ -253,10 +344,19 @@ fun HomeScreen(
                         }
                     } else {
                         items(expiringItems, key = { "expiring_${it.id}" }) { item ->
+                            val isSelected = selectedItemIds.contains(item.id)
                             ExpiringHighlightCard(
                                 item = item,
+                                isMultiSelectMode = isMultiSelectMode,
+                                isSelected = isSelected,
                                 onExportClaim = { viewModel.exportClaimPdf(context, item) },
-                                onClick = { onNavigateToDetail(item.id) }
+                                onClick = {
+                                    if (isMultiSelectMode) {
+                                        selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
+                                    } else {
+                                        onNavigateToDetail(item.id)
+                                    }
+                                }
                             )
                         }
                     }
@@ -348,7 +448,7 @@ fun HomeScreen(
                     )
 
                     // Category Filter Chips
-                    val categories = listOf("All", "Electronics", "Appliances", "Automotive", "Furniture", "Clothing", "Other")
+                    val categories = listOf("All", "Electronics", "Appliances", "Automotive", "Furniture", "Tools", "Home & Kitchen", "Fashion", "Clothing", "Other")
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(vertical = 4.dp)
@@ -428,16 +528,36 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
+                                val item = pair[0]
+                                val isSelected = selectedItemIds.contains(item.id)
                                 WarrantyVaultCard(
-                                    item = pair[0],
-                                    onClick = { onNavigateToDetail(pair[0].id) }
+                                    item = item,
+                                    isMultiSelectMode = isMultiSelectMode,
+                                    isSelected = isSelected,
+                                    onClick = {
+                                        if (isMultiSelectMode) {
+                                            selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
+                                        } else {
+                                            onNavigateToDetail(item.id)
+                                        }
+                                    }
                                 )
                             }
                             if (pair.size > 1) {
                                 Box(modifier = Modifier.weight(1f)) {
+                                    val item = pair[1]
+                                    val isSelected = selectedItemIds.contains(item.id)
                                     WarrantyVaultCard(
-                                        item = pair[1],
-                                        onClick = { onNavigateToDetail(pair[1].id) }
+                                        item = item,
+                                        isMultiSelectMode = isMultiSelectMode,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            if (isMultiSelectMode) {
+                                                selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
+                                            } else {
+                                                onNavigateToDetail(item.id)
+                                            }
+                                        }
                                     )
                                 }
                             } else {
@@ -447,9 +567,18 @@ fun HomeScreen(
                     }
                 } else {
                     items(filteredList, key = { it.id }) { item ->
+                        val isSelected = selectedItemIds.contains(item.id)
                         WarrantyVaultCard(
                             item = item,
-                            onClick = { onNavigateToDetail(item.id) }
+                            isMultiSelectMode = isMultiSelectMode,
+                            isSelected = isSelected,
+                            onClick = {
+                                if (isMultiSelectMode) {
+                                    selectedItemIds = if (isSelected) selectedItemIds - item.id else selectedItemIds + item.id
+                                } else {
+                                    onNavigateToDetail(item.id)
+                                }
+                            }
                         )
                     }
                 }
@@ -555,6 +684,8 @@ fun StatSubItem(label: String, value: String, isUrgent: Boolean = false) {
 @Composable
 fun ExpiringHighlightCard(
     item: WarrantyItem,
+    isMultiSelectMode: Boolean = false,
+    isSelected: Boolean = false,
     onExportClaim: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -587,6 +718,27 @@ fun ExpiringHighlightCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
+                    if (isMultiSelectMode) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) EmeraldPrimary else Color.Transparent)
+                                .border(2.dp, if (isSelected) EmeraldPrimary else Color.Black.copy(alpha = 0.4f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+
                     Text(
                         text = getCategoryEmoji(item.category),
                         fontSize = 20.sp
@@ -622,6 +774,29 @@ fun ExpiringHighlightCard(
                 color = Color.DarkGray
             )
 
+            if (item.tags.isNotBlank()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    item.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }.take(3).forEach { tag ->
+                        Surface(
+                            color = Color.White.copy(alpha = 0.8f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "#$tag",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+            }
+
             Button(
                 onClick = onExportClaim,
                 modifier = Modifier
@@ -652,6 +827,8 @@ fun ExpiringHighlightCard(
 @Composable
 fun WarrantyVaultCard(
     item: WarrantyItem,
+    isMultiSelectMode: Boolean = false,
+    isSelected: Boolean = false,
     onClick: () -> Unit
 ) {
     val now = System.currentTimeMillis()
@@ -694,6 +871,27 @@ fun WarrantyVaultCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
+                if (isMultiSelectMode) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) EmeraldPrimary else Color.Transparent)
+                            .border(2.dp, if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -802,10 +1000,13 @@ fun EmptyVaultState(isFiltered: Boolean, onResetFilters: () -> Unit) {
 fun getCategoryEmoji(category: String): String {
     return when (category.lowercase(Locale.US)) {
         "electronics" -> "📱"
+        "appliances" -> "🔌"
         "home & kitchen" -> "🏠"
         "fashion" -> "👟"
+        "clothing" -> "👕"
         "automotive" -> "🚗"
         "tools" -> "🛠️"
+        "furniture" -> "🛋️"
         else -> "🧾"
     }
 }

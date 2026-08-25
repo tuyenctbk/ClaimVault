@@ -175,6 +175,178 @@ object PdfClaimExporter {
         pdfFile
     }
 
+    suspend fun generateBundlePdf(context: Context, items: List<WarrantyItem>): File = withContext(Dispatchers.IO) {
+        val pdfDocument = PdfDocument()
+        val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+        
+        val paint = Paint()
+        val titlePaint = Paint().apply {
+            color = Color.parseColor("#0F172A")
+            textSize = 22f
+            isFakeBoldText = true
+        }
+        val subTitlePaint = Paint().apply {
+            color = Color.parseColor("#059669")
+            textSize = 14f
+            isFakeBoldText = true
+        }
+        val boldBodyPaint = Paint().apply {
+            color = Color.parseColor("#0F172A")
+            textSize = 12f
+            isFakeBoldText = true
+        }
+        val bodyPaint = Paint().apply {
+            color = Color.parseColor("#334155")
+            textSize = 12f
+        }
+        val headerBgPaint = Paint().apply {
+            color = Color.parseColor("#F1F5F9")
+        }
+
+        var pageNumber = 1
+
+        for (item in items) {
+            // PAGE 1: Product details
+            val pageInfo = PdfDocument.PageInfo.Builder(595, 842, pageNumber++).create()
+            val page = pdfDocument.startPage(pageInfo)
+            val canvas = page.canvas
+
+            // Draw Header Banner
+            canvas.drawRect(0f, 0f, 595f, 90f, headerBgPaint)
+            canvas.drawText("ClaimVault Warranty Bundle Packet", 30f, 40f, titlePaint)
+            canvas.drawText("Stored 100% Locally • Batch Claim Package Proof", 30f, 65f, subTitlePaint)
+
+            var yPos = 120f
+
+            val purchaseStr = dateFormat.format(Date(item.purchaseDateEpoch))
+            val expiryStr = if (item.warrantyDurationMonths == -1) "Lifetime Warranty" else dateFormat.format(Date(item.expiryDateEpoch))
+            val now = System.currentTimeMillis()
+            val daysLeft = if (item.warrantyDurationMonths == -1) 9999 else ((item.expiryDateEpoch - now) / 86400000L).toInt()
+
+            val statusText = when {
+                item.warrantyDurationMonths == -1 -> "LIFETIME WARRANTY"
+                daysLeft < 0 -> "EXPIRED ($daysLeft days ago)"
+                daysLeft <= 30 -> "EXPIRING SOON ($daysLeft Days Remaining)"
+                else -> "ACTIVE ($daysLeft Days Remaining)"
+            }
+
+            val statusColor = when {
+                daysLeft < 0 -> Color.parseColor("#DC2626")
+                daysLeft <= 30 -> Color.parseColor("#D97706")
+                else -> Color.parseColor("#059669")
+            }
+
+            val statusPaint = Paint().apply {
+                color = statusColor
+                textSize = 13f
+                isFakeBoldText = true
+            }
+
+            canvas.drawText("PRODUCT INFORMATION", 30f, yPos, boldBodyPaint)
+            yPos += 8f
+            canvas.drawLine(30f, yPos, 565f, yPos, Paint().apply { color = Color.LTGRAY; strokeWidth = 1f })
+            yPos += 24f
+
+            canvas.drawText("Item Title:", 30f, yPos, boldBodyPaint)
+            canvas.drawText(item.title, 140f, yPos, bodyPaint)
+
+            canvas.drawText("Merchant:", 320f, yPos, boldBodyPaint)
+            canvas.drawText(item.merchant, 410f, yPos, bodyPaint)
+            yPos += 22f
+
+            canvas.drawText("Category:", 30f, yPos, boldBodyPaint)
+            canvas.drawText(item.category, 140f, yPos, bodyPaint)
+
+            canvas.drawText("Purchase Price:", 320f, yPos, boldBodyPaint)
+            canvas.drawText("${item.currency}${String.format(Locale.US, "%.2f", item.price)}", 410f, yPos, bodyPaint)
+            yPos += 22f
+
+            canvas.drawText("Purchase Date:", 30f, yPos, boldBodyPaint)
+            canvas.drawText(purchaseStr, 140f, yPos, bodyPaint)
+
+            canvas.drawText("Expiry Date:", 320f, yPos, boldBodyPaint)
+            canvas.drawText(expiryStr, 410f, yPos, bodyPaint)
+            yPos += 22f
+
+            canvas.drawText("Model Number:", 30f, yPos, boldBodyPaint)
+            canvas.drawText(if (item.modelNumber.isNotBlank()) item.modelNumber else "N/A", 140f, yPos, bodyPaint)
+
+            canvas.drawText("Serial Number:", 320f, yPos, boldBodyPaint)
+            canvas.drawText(if (item.serialNumber.isNotBlank()) item.serialNumber else "N/A", 410f, yPos, bodyPaint)
+            yPos += 22f
+
+            canvas.drawText("Claim Status:", 30f, yPos, boldBodyPaint)
+            canvas.drawText(statusText, 140f, yPos, statusPaint)
+            yPos += 30f
+
+            if (item.notes.isNotBlank()) {
+                canvas.drawText("NOTES & REPAIR HISTORY", 30f, yPos, boldBodyPaint)
+                yPos += 8f
+                canvas.drawLine(30f, yPos, 565f, yPos, Paint().apply { color = Color.LTGRAY; strokeWidth = 1f })
+                yPos += 20f
+
+                canvas.drawText(item.notes, 30f, yPos, bodyPaint)
+                yPos += 35f
+            }
+
+            if (item.tags.isNotBlank()) {
+                canvas.drawText("TAGS", 30f, yPos, boldBodyPaint)
+                yPos += 8f
+                canvas.drawLine(30f, yPos, 565f, yPos, Paint().apply { color = Color.LTGRAY; strokeWidth = 1f })
+                yPos += 20f
+
+                canvas.drawText(item.tags, 30f, yPos, bodyPaint)
+                yPos += 35f
+            }
+
+            pdfDocument.finishPage(page)
+
+            // PAGE 2: Receipt Photo (if exists)
+            if (!item.receiptImagePath.isNullOrBlank() && File(item.receiptImagePath).exists()) {
+                val imgPageInfo = PdfDocument.PageInfo.Builder(595, 842, pageNumber++).create()
+                val imgPage = pdfDocument.startPage(imgPageInfo)
+                val imgCanvas = imgPage.canvas
+
+                imgCanvas.drawRect(0f, 0f, 595f, 60f, headerBgPaint)
+                imgCanvas.drawText("ClaimVault Receipt Attachment - ${item.title}", 30f, 38f, Paint().apply {
+                    color = Color.parseColor("#0F172A")
+                    textSize = 14f
+                    isFakeBoldText = true
+                })
+
+                try {
+                    val bitmap = BitmapFactory.decodeFile(item.receiptImagePath)
+                    if (bitmap != null) {
+                        val availableWidth = 535f
+                        val availableHeight = 720f
+                        val scale = Math.min(availableWidth / bitmap.width, availableHeight / bitmap.height)
+                        val drawWidth = (bitmap.width * scale).toInt()
+                        val drawHeight = (bitmap.height * scale).toInt()
+
+                        val xOffset = (595f - drawWidth) / 2
+                        val destRect = Rect(xOffset.toInt(), 80, (xOffset + drawWidth).toInt(), 80 + drawHeight)
+                        imgCanvas.drawBitmap(bitmap, null, destRect, null)
+                    }
+                } catch (e: Exception) {
+                    imgCanvas.drawText("[Receipt image attachment failed to draw: ${e.localizedMessage}]", 30f, 100f, bodyPaint)
+                }
+
+                pdfDocument.finishPage(imgPage)
+            }
+        }
+
+        val claimsDir = File(context.cacheDir, "claims")
+        if (!claimsDir.exists()) claimsDir.mkdirs()
+
+        val pdfFile = File(claimsDir, "ClaimVault_Bundle_${System.currentTimeMillis()}.pdf")
+        FileOutputStream(pdfFile).use { out ->
+            pdfDocument.writeTo(out)
+        }
+        pdfDocument.close()
+
+        pdfFile
+    }
+
     fun shareClaimPdf(context: Context, pdfFile: File) {
         val uri: Uri = FileProvider.getUriForFile(
             context,

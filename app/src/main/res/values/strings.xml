@@ -1,3 +1,25 @@
 <resources>
     <string name="app_name">ClaimVault</string>
+    <string name="welcome_title">Welcome to ClaimVault</string>
+    <string name="subtitle_privacy">100% Offline &amp; Private</string>
+    <string name="scan_new_receipt">SCAN NEW RECEIPT</string>
+    <string name="search_vault_hint">Search your vault...</string>
+    <string name="active_protection">ACTIVE PROTECTION</string>
+    <string name="expiring_soon">EXPIRING SOON</string>
+    <string name="category_all">All</string>
+    <string name="category_electronics">Electronics</string>
+    <string name="category_appliances">Appliances</string>
+    <string name="category_automotive">Automotive</string>
+    <string name="category_furniture">Furniture</string>
+    <string name="category_clothing">Clothing</string>
+    <string name="category_tools">Tools</string>
+    <string name="category_home_kitchen">Home &amp; Kitchen</string>
+    <string name="category_fashion">Fashion</string>
+    <string name="category_other">Other</string>
+    <string name="settings_title">Settings &amp; Preferences</string>
+    <string name="vault_analytics">Vault Analytics &amp; Dashboard</string>
+    <string name="add_receipt_title">Quick Add Receipt</string>
+    <string name="edit_warranty_title">Edit Warranty</string>
+    <string name="save_item">SAVE ITEM</string>
+    <string name="delete_item">DELETE WARRANTY</string>
 </resources>

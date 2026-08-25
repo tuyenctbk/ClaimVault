@@ -51,6 +51,12 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
     val themeMode: StateFlow<ThemeMode> = themePreferences.themeMode
     val appLanguage: StateFlow<AppLanguage> = themePreferences.appLanguage
     val hasCompletedOnboarding: StateFlow<Boolean> = themePreferences.hasCompletedOnboarding
+    val isBiometricEnabled: StateFlow<Boolean> = themePreferences.isBiometricEnabled
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        themePreferences.setBiometricEnabled(enabled)
+        FirebaseManager.logEvent("biometric_toggled", mapOf("enabled" to enabled))
+    }
 
     fun setAppLanguage(lang: AppLanguage) {
         themePreferences.setAppLanguage(lang)
@@ -94,11 +100,20 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
     var scannedAmount: Double? = null
     var scannedDateEpoch: Long? = null
     var scannedCurrency: String? = null
+    var scannedCategory: String? = null
 
     val messageEvent = MutableStateFlow<String?>(null)
 
     init {
         FirebaseManager.init(application)
+        com.example.notification.DailyExpiryCheckReceiver.scheduleNextDailyCheck(application)
+        viewModelScope.launch {
+            try {
+                com.example.notification.DailyExpiryCheckReceiver.checkAllExpiries(application)
+            } catch (e: Exception) {
+                // Fail-safe
+            }
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -109,6 +124,17 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
     fun completeOnboarding() {
         themePreferences.completeOnboarding()
         FirebaseManager.logEvent("onboarding_completed")
+    }
+
+    val hasCompletedCameraOnboarding: StateFlow<Boolean> = themePreferences.hasCompletedCameraOnboarding
+
+    fun completeCameraOnboarding() {
+        themePreferences.completeCameraOnboarding()
+        FirebaseManager.logEvent("camera_onboarding_completed")
+    }
+
+    fun resetCameraOnboarding() {
+        themePreferences.resetCameraOnboarding()
     }
 
     fun getWarrantyById(id: Long): Flow<WarrantyItem?> = repository.getWarrantyById(id)
@@ -293,13 +319,42 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun exportClaimBundlePdf(context: Context, items: List<WarrantyItem>) {
+        viewModelScope.launch {
+            if (items.isEmpty()) {
+                messageEvent.value = "Please select at least one item to bundle"
+                return@launch
+            }
+            try {
+                val pdfFile = PdfClaimExporter.generateBundlePdf(context, items)
+                PdfClaimExporter.shareClaimPdf(context, pdfFile)
+                messageEvent.value = "Claim bundle generated!"
+            } catch (e: Exception) {
+                messageEvent.value = "Error generating claim bundle: ${e.localizedMessage}"
+            }
+        }
+    }
+
     fun exportBackup(context: Context) {
         viewModelScope.launch {
             try {
                 val file = BackupRestoreUtil.exportBackupJson(context, repository)
-                messageEvent.value = "Backup exported to: ${file.name}"
+                BackupRestoreUtil.shareExportedFile(context, file, "application/json", "ClaimVault JSON Backup")
+                messageEvent.value = "JSON Backup exported to: ${file.name}"
             } catch (e: Exception) {
                 messageEvent.value = "Backup failed: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun exportBackupCsv(context: Context) {
+        viewModelScope.launch {
+            try {
+                val file = BackupRestoreUtil.exportBackupCsv(context, repository)
+                BackupRestoreUtil.shareExportedFile(context, file, "text/csv", "ClaimVault Receipts CSV Export")
+                messageEvent.value = "CSV exported to: ${file.name}"
+            } catch (e: Exception) {
+                messageEvent.value = "CSV Export failed: ${e.localizedMessage}"
             }
         }
     }
@@ -311,6 +366,17 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
                 messageEvent.value = "Restored $count warranties successfully!"
             } catch (e: Exception) {
                 messageEvent.value = "Restore failed: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun importBackupCsv(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val count = BackupRestoreUtil.importBackupCsv(context, uri, repository)
+                messageEvent.value = "Restored $count warranties from CSV successfully!"
+            } catch (e: Exception) {
+                messageEvent.value = "CSV Import failed: ${e.localizedMessage}"
             }
         }
     }
@@ -341,6 +407,69 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
                 messageEvent.value = "Restored $count encrypted items successfully!"
             } catch (e: Exception) {
                 messageEvent.value = "Encrypted restore failed (incorrect password?): ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun backupToFirestore(syncKey: String, passphrase: String) {
+        viewModelScope.launch {
+            try {
+                if (syncKey.isBlank() || passphrase.isBlank()) {
+                    messageEvent.value = "Sync Key and Passphrase are required for Cloud Backup"
+                    return@launch
+                }
+                val items = allWarranties.value
+                val jsonPayload = BackupRestoreUtil.serializeItemsToJson(items)
+                val encryptedBytes = BackupRestoreUtil.encryptData(jsonPayload.toByteArray(Charsets.UTF_8), passphrase)
+                val base64Payload = android.util.Base64.encodeToString(encryptedBytes, android.util.Base64.NO_WRAP)
+
+                FirebaseManager.backupToFirestore(
+                    deviceId = syncKey,
+                    encryptedPayload = base64Payload,
+                    itemCount = items.size,
+                    onSuccess = {
+                        messageEvent.value = "Successfully backed up ${items.size} items to Firestore Cloud!"
+                        FirebaseManager.logEvent("firestore_backup_success", mapOf("item_count" to items.size))
+                    },
+                    onError = { err ->
+                        messageEvent.value = "Firestore Backup failed: $err"
+                    }
+                )
+            } catch (e: Exception) {
+                messageEvent.value = "Cloud Backup Error: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun restoreFromFirestore(syncKey: String, passphrase: String) {
+        viewModelScope.launch {
+            try {
+                if (syncKey.isBlank() || passphrase.isBlank()) {
+                    messageEvent.value = "Sync Key and Passphrase are required for Cloud Restore"
+                    return@launch
+                }
+                FirebaseManager.restoreFromFirestore(
+                    deviceId = syncKey,
+                    onSuccess = { base64Payload ->
+                        viewModelScope.launch {
+                            try {
+                                val encryptedBytes = android.util.Base64.decode(base64Payload, android.util.Base64.NO_WRAP)
+                                val decryptedBytes = BackupRestoreUtil.decryptData(encryptedBytes, passphrase)
+                                val decryptedJson = String(decryptedBytes, Charsets.UTF_8)
+                                val count = BackupRestoreUtil.deserializeItemsFromJson(decryptedJson, repository)
+                                messageEvent.value = "Restored $count items from Firestore Cloud Sync!"
+                                FirebaseManager.logEvent("firestore_restore_success", mapOf("item_count" to count))
+                            } catch (e: Exception) {
+                                messageEvent.value = "Cloud Decryption failed (invalid passphrase?): ${e.localizedMessage}"
+                            }
+                        }
+                    },
+                    onError = { err ->
+                        messageEvent.value = "Firestore Restore failed: $err"
+                    }
+                )
+            } catch (e: Exception) {
+                messageEvent.value = "Cloud Restore Error: ${e.localizedMessage}"
             }
         }
     }

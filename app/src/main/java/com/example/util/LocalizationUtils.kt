@@ -131,8 +131,127 @@ object LocalizationMap {
         "Lifetime" to "Trọn đời"
     )
 
+    private val esMap = mapOf(
+        "Welcome to ClaimVault" to "Bienvenido a ClaimVault",
+        "100% Offline & Private" to "100% Sin conexión y Privado",
+        "Instant OCR Scan" to "Escaneo OCR Instantáneo",
+        "Expiry Alerts & PDF Export" to "Alertas de Vencimiento y Exportación PDF",
+        "Skip" to "Omitir",
+        "Next" to "Siguiente",
+        "Get Started" to "Empezar",
+        "Settings & Preferences" to "Configuración y Preferencias",
+        "App Theme Mode" to "Modo de Tema",
+        "Search your vault..." to "Buscar en tu bóveda...",
+        "ACTIVE PROTECTION" to "PROTECCIÓN ACTIVA",
+        "EXPIRING SOON" to "PRÓXIMO A VENCER",
+        "SCAN NEW RECEIPT" to "ESCANEAR NUEVO RECIBO",
+        "All" to "Todos",
+        "Electronics" to "Electrónica",
+        "Appliances" to "Electrodomésticos",
+        "Automotive" to "Automotriz",
+        "Furniture" to "Muebles",
+        "Clothing" to "Ropa",
+        "Other" to "Otros",
+        "Tools" to "Herramientas",
+        "Home & Kitchen" to "Hogar y Cocina",
+        "Fashion" to "Moda",
+        "Vault Analytics" to "Análisis de Bóveda",
+        "Settings" to "Ajustes",
+        "App Language" to "Idioma de la Aplicación",
+        "Product Title" to "Título del Producto",
+        "Merchant / Store" to "Comercio / Tienda",
+        "Price Paid" to "Precio Pagado",
+        "Category" to "Categoría",
+        "Warranty Duration" to "Duración de Garantía",
+        "SAVE ITEM" to "GUARDAR ELEMENTO",
+        "EDIT WARRANTY" to "EDITAR GARANTÍA",
+        "DELETE WARRANTY" to "ELIMINAR GARANTÍA",
+        "DOWNLOAD CLAIM PDF" to "DESCARGAR PDF DE RECLAMACIÓN"
+    )
+
+    private val frMap = mapOf(
+        "Welcome to ClaimVault" to "Bienvenue sur ClaimVault",
+        "100% Offline & Private" to "100% Hors Ligne et Privé",
+        "Instant OCR Scan" to "Numérisation OCR Instantanée",
+        "Expiry Alerts & PDF Export" to "Alertes d'Expiration et Export PDF",
+        "Skip" to "Passer",
+        "Next" to "Suivant",
+        "Get Started" to "Commencer",
+        "Settings & Preferences" to "Paramètres et Préférences",
+        "App Theme Mode" to "Mode Thème",
+        "Search your vault..." to "Rechercher dans votre coffre...",
+        "ACTIVE PROTECTION" to "PROTECTION ACTIVE",
+        "EXPIRING SOON" to "EXPIRE BIENTÔT",
+        "SCAN NEW RECEIPT" to "NUMÉRISER NOUVEAU REÇU",
+        "All" to "Tous",
+        "Electronics" to "Électronique",
+        "Appliances" to "Électroménager",
+        "Automotive" to "Automobile",
+        "Furniture" to "Meubles",
+        "Clothing" to "Vêtements",
+        "Other" to "Autre",
+        "Tools" to "Outils",
+        "Home & Kitchen" to "Maison et Cuisine",
+        "Fashion" to "Mode",
+        "Vault Analytics" to "Analyses du Coffre",
+        "Settings" to "Paramètres",
+        "App Language" to "Langue de l'Application",
+        "Product Title" to "Nom du Produit",
+        "Merchant / Store" to "Commerçant / Magasin",
+        "Price Paid" to "Prix Payé",
+        "Category" to "Catégorie",
+        "Warranty Duration" to "Durée de Garantie",
+        "SAVE ITEM" to "ENREGISTRER",
+        "EDIT WARRANTY" to "MODIFIER GARANTIE",
+        "DELETE WARRANTY" to "SUPPRIMER GARANTIE",
+        "DOWNLOAD CLAIM PDF" to "TÉLÉCHARGER PDF DE RÉCLAMATION"
+    )
+
+    private val deMap = mapOf(
+        "Welcome to ClaimVault" to "Willkommen bei ClaimVault",
+        "100% Offline & Private" to "100% Offline & Privat",
+        "Instant OCR Scan" to "Sofortiges OCR-Scannen",
+        "Expiry Alerts & PDF Export" to "Ablaufwarnungen & PDF-Export",
+        "Skip" to "Überspringen",
+        "Next" to "Weiter",
+        "Get Started" to "Loslegen",
+        "Settings & Preferences" to "Einstellungen & Präferenzen",
+        "App Theme Mode" to "Design-Modus",
+        "Search your vault..." to "Tresor durchsuchen...",
+        "ACTIVE PROTECTION" to "AKTIVER SCHUTZ",
+        "EXPIRING SOON" to "LÄUFT BALD AB",
+        "SCAN NEW RECEIPT" to "NEUEN BELEG SCANNEN",
+        "All" to "Alle",
+        "Electronics" to "Elektronik",
+        "Appliances" to "Haushaltsgeräte",
+        "Automotive" to "Automobil",
+        "Furniture" to "Möbel",
+        "Clothing" to "Kleidung",
+        "Other" to "Sonstiges",
+        "Tools" to "Werkzeuge",
+        "Home & Kitchen" to "Haus & Küche",
+        "Fashion" to "Mode",
+        "Vault Analytics" to "Tresor-Analysen",
+        "Settings" to "Einstellungen",
+        "App Language" to "App-Sprache",
+        "Product Title" to "Produktbezeichnung",
+        "Merchant / Store" to "Händler / Geschäft",
+        "Price Paid" to "Kaufpreis",
+        "Category" to "Kategorie",
+        "Warranty Duration" to "Garantiedauer",
+        "SAVE ITEM" to "SPEICHERN",
+        "EDIT WARRANTY" to "BEARBEITEN",
+        "DELETE WARRANTY" to "LÖSCHEN",
+        "DOWNLOAD CLAIM PDF" to "ANSPRUCHS-PDF HERUNTERLADEN"
+    )
+
     fun translate(key: String, lang: AppLanguage): String {
-        if (lang == AppLanguage.EN) return key
-        return viMap[key] ?: key
+        return when (lang) {
+            AppLanguage.EN -> key
+            AppLanguage.ES -> esMap[key] ?: key
+            AppLanguage.FR -> frMap[key] ?: key
+            AppLanguage.DE -> deMap[key] ?: key
+            AppLanguage.VI -> viMap[key] ?: key
+        }
     }
 }

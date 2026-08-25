@@ -43,6 +43,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -138,13 +141,17 @@ fun AddEditWarrantyScreen(
             if (viewModel.scannedCurrency != null && !viewModel.scannedCurrency.isNullOrBlank()) {
                 currency = viewModel.scannedCurrency!!
             }
-            ocrDetectedText = "CameraX ML Kit OCR: ${viewModel.scannedMerchant ?: "Receipt"}, ${currency}${viewModel.scannedAmount ?: 0.0}"
+            if (!viewModel.scannedCategory.isNullOrBlank()) {
+                category = viewModel.scannedCategory!!
+            }
+            ocrDetectedText = "CameraX ML Kit OCR: ${viewModel.scannedMerchant ?: "Receipt"}, ${currency}${viewModel.scannedAmount ?: 0.0} (${viewModel.scannedCategory ?: "Electronics"})"
 
             viewModel.scannedReceiptPath = null
             viewModel.scannedMerchant = null
             viewModel.scannedAmount = null
             viewModel.scannedDateEpoch = null
             viewModel.scannedCurrency = null
+            viewModel.scannedCategory = null
         }
     }
 
@@ -160,7 +167,7 @@ fun AddEditWarrantyScreen(
                     receiptImagePath = path
                 }
                 if (ocrResult != null) {
-                    ocrDetectedText = "Detected: ${ocrResult.merchant ?: "Receipt"}, ${ocrResult.currency}${ocrResult.totalAmount ?: "0.00"}"
+                    ocrDetectedText = "Detected: ${ocrResult.merchant ?: "Receipt"}, ${ocrResult.currency}${ocrResult.totalAmount ?: "0.00"} (${ocrResult.suggestedCategory})"
                     if (merchant.isBlank() && !ocrResult.merchant.isNullOrBlank()) {
                         merchant = ocrResult.merchant
                     }
@@ -171,6 +178,7 @@ fun AddEditWarrantyScreen(
                         purchaseDateEpoch = ocrResult.purchaseDateEpoch
                     }
                     currency = ocrResult.currency
+                    category = ocrResult.suggestedCategory
                 }
             }
         }
@@ -455,17 +463,65 @@ fun AddEditWarrantyScreen(
             )
 
             // Category Selector
-            Text(
-                text = "Category".localize(appLanguage),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Category".localize(appLanguage),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                if (ocrDetectedText != null) {
+                    Surface(
+                        color = EmeraldLightContainer,
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "Auto-Suggested",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = EmeraldDark,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
 
             CategoryDropdown(
                 selectedCategory = category,
                 appLanguage = appLanguage,
                 onCategorySelected = { category = it }
             )
+
+            // Quick Category Chips
+            val quickCategories = listOf("Electronics", "Appliances", "Home & Kitchen", "Fashion", "Automotive", "Tools", "Furniture")
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 2.dp)
+            ) {
+                items(quickCategories) { cat ->
+                    val isSelected = category.equals(cat, ignoreCase = true)
+                    Surface(
+                        modifier = Modifier.clickable { category = cat },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.surfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        Text(
+                            text = "${com.example.util.getCategoryEmoji(cat)} ${cat.localize(appLanguage)}",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
 
             // Warranty Duration Selector
             Text(
@@ -557,17 +613,47 @@ fun AddEditWarrantyScreen(
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
             )
 
-            OutlinedTextField(
-                value = tagsInput,
-                onValueChange = { tagsInput = it },
-                label = { Text("Custom Tags (comma separated)".localize(appLanguage)) },
-                placeholder = { Text("e.g. Tax, Business, Priority".localize(appLanguage)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("input_tags"),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = tagsInput,
+                    onValueChange = { tagsInput = it },
+                    label = { Text("Custom Tags (comma separated)".localize(appLanguage)) },
+                    placeholder = { Text("e.g. Tax, Business, Priority".localize(appLanguage)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_tags"),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
+                )
+
+                val suggestions = listOf("Tax", "Business", "Personal", "Priority", "Warranty", "Gift")
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 2.dp)
+                ) {
+                    items(suggestions) { sug ->
+                        Surface(
+                            modifier = Modifier.clickable {
+                                val currentTags = tagsInput.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                                if (!currentTags.contains(sug)) {
+                                    tagsInput = if (tagsInput.isBlank()) sug else "$tagsInput, $sug"
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = "+ $sug",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
 
             // Save Button
             Button(
@@ -629,7 +715,7 @@ fun CategoryDropdown(
     onCategorySelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val categories = listOf("Electronics", "Appliances", "Automotive", "Furniture", "Clothing", "Other")
+    val categories = listOf("Electronics", "Appliances", "Home & Kitchen", "Fashion", "Clothing", "Automotive", "Tools", "Furniture", "Other")
 
     ExposedDropdownMenuBox(
         expanded = expanded,

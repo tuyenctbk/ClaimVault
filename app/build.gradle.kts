@@ -25,8 +25,8 @@ android {
     applicationId = "com.soloprono.claimvault"
     minSdk = 24
     targetSdk = 36
-    versionCode = 13
-    versionName = "1.4.2"
+    versionCode = 14
+    versionName = "1.4.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -95,7 +95,7 @@ dependencies {
   implementation(libs.androidx.camera.core)
   implementation(libs.androidx.camera.lifecycle)
   implementation(libs.androidx.camera.view)
-  implementation("com.google.mlkit:text-recognition:16.0.0")
+  implementation("com.google.mlkit:text-recognition:16.0.1")
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)

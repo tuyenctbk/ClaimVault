@@ -10,18 +10,18 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class OpenFactsProduct(
-    @Json(name = "product_name") val productName: String? = null,
-    @Json(name = "brands") val brands: String? = null,
-    @Json(name = "categories") val categories: String? = null,
-    @Json(name = "image_front_url") val imageFrontUrl: String? = null,
-    @Json(name = "image_url") val imageUrl: String? = null,
-    @Json(name = "code") val code: String? = null
+    @param:Json(name = "product_name") val productName: String? = null,
+    @param:Json(name = "brands") val brands: String? = null,
+    @param:Json(name = "categories") val categories: String? = null,
+    @param:Json(name = "image_front_url") val imageFrontUrl: String? = null,
+    @param:Json(name = "image_url") val imageUrl: String? = null,
+    @param:Json(name = "code") val code: String? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class OpenFactsResponse(
-    @Json(name = "status") val status: Int = 0,
-    @Json(name = "product") val product: OpenFactsProduct? = null
+    @param:Json(name = "status") val status: Int = 0,
+    @param:Json(name = "product") val product: OpenFactsProduct? = null
 )
 
 interface OpenBarcodeApiService {

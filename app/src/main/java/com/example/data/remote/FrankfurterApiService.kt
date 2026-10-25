@@ -11,10 +11,10 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class FrankfurterResponse(
-    @Json(name = "amount") val amount: Double = 1.0,
-    @Json(name = "base") val base: String,
-    @Json(name = "date") val date: String,
-    @Json(name = "rates") val rates: Map<String, Double> = emptyMap()
+    @param:Json(name = "amount") val amount: Double = 1.0,
+    @param:Json(name = "base") val base: String,
+    @param:Json(name = "date") val date: String,
+    @param:Json(name = "rates") val rates: Map<String, Double> = emptyMap()
 )
 
 interface FrankfurterApiService {

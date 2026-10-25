@@ -90,8 +90,30 @@ class SmartPromptManager(private val context: Context) {
         return !hasShared && dismissCount < 2 && count >= 5
     }
 
-    fun checkForAppUpdate(currentVersionCode: Int = 12, newVersionCode: Int = 15, versionName: String = "1.5.0", highlights: String = "") {
-        latestVersionName = versionName
+    private val appCurrentVersionCode: Int
+        get() = try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                pInfo.longVersionCode.toInt()
+            } else {
+                @Suppress("DEPRECATION")
+                pInfo.versionCode
+            }
+        } catch (e: Exception) {
+            com.example.BuildConfig.VERSION_CODE
+        }
+
+    private var pendingUpdateVersionCode: Int = 0
+
+    fun checkForAppUpdate(
+        currentVersionCode: Int = appCurrentVersionCode,
+        newVersionCode: Int = appCurrentVersionCode,
+        versionName: String = "",
+        highlights: String = ""
+    ) {
+        if (newVersionCode <= currentVersionCode) return
+        pendingUpdateVersionCode = newVersionCode
+        if (versionName.isNotBlank()) latestVersionName = versionName
         if (highlights.isNotBlank()) latestVersionHighlights = highlights
 
         val ignoredVersion = prefs.getInt("ignored_update_version_code", 0)
@@ -99,7 +121,7 @@ class SmartPromptManager(private val context: Context) {
         val now = System.currentTimeMillis()
         val updateCooldown = 14 * 24 * 60 * 60 * 1000L // 14 days cooldown for update check
 
-        if (newVersionCode > currentVersionCode && newVersionCode > ignoredVersion) {
+        if (newVersionCode > ignoredVersion) {
             if ((now - lastUpdatePrompt) > updateCooldown && !isPromptInCooldown()) {
                 _showUpdateDialog.value = true
                 prefs.edit().putLong("last_update_prompt_ms", now).apply()
@@ -153,8 +175,8 @@ class SmartPromptManager(private val context: Context) {
 
     fun dismissUpdateDialog(remindLater: Boolean = true, ignoreVersion: Boolean = false) {
         _showUpdateDialog.value = false
-        if (ignoreVersion) {
-            prefs.edit().putInt("ignored_update_version_code", 15).apply()
+        if (ignoreVersion && pendingUpdateVersionCode > 0) {
+            prefs.edit().putInt("ignored_update_version_code", pendingUpdateVersionCode).apply()
         }
     }
 

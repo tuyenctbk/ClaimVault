@@ -6,6 +6,10 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.WarrantyItem
+import com.example.data.repository.BarcodeProductResult
+import com.example.data.repository.BarcodeRepository
+import com.example.data.repository.CurrencyConversionResult
+import com.example.data.repository.CurrencyRepository
 import com.example.data.repository.WarrantyRepository
 import com.example.notification.ExpiryNotificationScheduler
 import com.example.util.BackupRestoreUtil
@@ -21,6 +25,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -47,6 +52,8 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
     private val repository = WarrantyRepository.getInstance(application)
     private val themePreferences = ThemePreferences(application)
     val smartPromptManager = SmartPromptManager(application)
+    private val currencyRepository = CurrencyRepository()
+    private val barcodeRepository = BarcodeRepository()
 
     val themeMode: StateFlow<ThemeMode> = themePreferences.themeMode
     val appLanguage: StateFlow<AppLanguage> = themePreferences.appLanguage
@@ -95,6 +102,13 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
     val isScanningOcr = MutableStateFlow(false)
     val lastOcrResult = MutableStateFlow<OcrResult?>(null)
 
+    // Barcode & Currency Lookup State
+    val isLookingUpBarcode = MutableStateFlow(false)
+    val barcodeSearchResult = MutableStateFlow<BarcodeProductResult?>(null)
+
+    val isConvertingCurrency = MutableStateFlow(false)
+    val currencyConversionState = MutableStateFlow<CurrencyConversionResult?>(null)
+
     var scannedReceiptPath: String? = null
     var scannedMerchant: String? = null
     var scannedAmount: Double? = null
@@ -114,6 +128,8 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
                 // Fail-safe
             }
         }
+        // Check app update in background with smart cooldown
+        smartPromptManager.checkForAppUpdate()
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -138,6 +154,59 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun getWarrantyById(id: Long): Flow<WarrantyItem?> = repository.getWarrantyById(id)
+
+    // 100% Free Open Barcode Lookup
+    fun lookupBarcode(rawBarcode: String, onResult: (BarcodeProductResult?) -> Unit = {}) {
+        if (rawBarcode.isBlank()) return
+        viewModelScope.launch {
+            isLookingUpBarcode.value = true
+            val res = barcodeRepository.lookupBarcode(rawBarcode)
+            res.onSuccess { product ->
+                barcodeSearchResult.value = product
+                onResult(product)
+                messageEvent.value = "Product found via Barcode Lookup: ${product.brand} ${product.title}"
+                FirebaseManager.logEvent("barcode_lookup_success", mapOf("brand" to product.brand))
+            }.onFailure { err ->
+                messageEvent.value = "Barcode lookup failed: ${err.localizedMessage}"
+                onResult(null)
+            }
+            isLookingUpBarcode.value = false
+        }
+    }
+
+    fun clearBarcodeSearchResult() {
+        barcodeSearchResult.value = null
+    }
+
+    // Frankfurter API Currency Conversion
+    fun convertCurrency(
+        amount: Double,
+        fromCurrency: String,
+        targetCurrency: String,
+        dateEpochMs: Long = System.currentTimeMillis(),
+        onResult: (CurrencyConversionResult?) -> Unit = {}
+    ) {
+        if (amount <= 0.0) return
+        viewModelScope.launch {
+            isConvertingCurrency.value = true
+            val res = currencyRepository.convertCurrency(amount, fromCurrency, targetCurrency, dateEpochMs)
+            res.onSuccess { conversion ->
+                currencyConversionState.value = conversion
+                onResult(conversion)
+                val rateFormatted = String.format("%.2f", conversion.targetAmount)
+                messageEvent.value = "Converted ${conversion.originalAmount} ${conversion.fromCurrency} = $rateFormatted ${conversion.targetCurrency} (${conversion.date})"
+                FirebaseManager.logEvent("currency_converted", mapOf("from" to conversion.fromCurrency, "to" to conversion.targetCurrency))
+            }.onFailure { err ->
+                messageEvent.value = "Currency conversion failed: ${err.localizedMessage}"
+                onResult(null)
+            }
+            isConvertingCurrency.value = false
+        }
+    }
+
+    fun clearCurrencyConversion() {
+        currencyConversionState.value = null
+    }
 
     val filteredWarranties: StateFlow<List<WarrantyItem>> = combine(
         combine(allWarranties, searchQuery, selectedCategory) { items, query, cat -> Triple(items, query, cat) },
@@ -313,6 +382,7 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
             try {
                 val pdfFile = PdfClaimExporter.generateClaimPdf(context, item)
                 PdfClaimExporter.shareClaimPdf(context, pdfFile)
+                smartPromptManager.onClaimPdfExported()
             } catch (e: Exception) {
                 messageEvent.value = "Error generating claim PDF: ${e.localizedMessage}"
             }
@@ -328,6 +398,7 @@ class ClaimVaultViewModel(application: Application) : AndroidViewModel(applicati
             try {
                 val pdfFile = PdfClaimExporter.generateBundlePdf(context, items)
                 PdfClaimExporter.shareClaimPdf(context, pdfFile)
+                smartPromptManager.onClaimPdfExported()
                 messageEvent.value = "Claim bundle generated!"
             } catch (e: Exception) {
                 messageEvent.value = "Error generating claim bundle: ${e.localizedMessage}"

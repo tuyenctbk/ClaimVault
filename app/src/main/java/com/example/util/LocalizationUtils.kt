@@ -22,6 +22,25 @@ object LocalizationMap {
         "Get Started" to "Bắt đầu",
         "ClaimVault" to "ClaimVault",
 
+        // New Features (UPC & Frankfurter & Update App)
+        "UPC / EAN Barcode Auto-Fill" to "Tự động điền mã vạch UPC / EAN",
+        "100% Free Open API" to "API Mở Miễn Phí 100%",
+        "Product Barcode" to "Mã vạch sản phẩm",
+        "Lookup" to "Tra cứu",
+        "Bought abroad? Convert currency (Frankfurter API)" to "Mua ở nước ngoài? Quy đổi tiền tệ (Frankfurter API)",
+        "Frankfurter Currency Converter" to "Bộ quy đổi tiền tệ Frankfurter",
+        "Convert foreign receipt price on purchase date" to "Quy đổi giá hóa đơn ngoại tệ theo ngày mua",
+        "Calculate Rate via Frankfurter API" to "Tính tỷ giá qua Frankfurter API",
+        "APPLY TO RECEIPT PRICE" to "ÁP DỤNG VÀO GIÁ HÓA ĐƠN",
+        "ClaimVault Update Available" to "Cập nhật ClaimVault mới",
+        "What's New:" to "Tính năng mới:",
+        "UPDATE NOW" to "CẬP NHẬT NGAY",
+        "Remind Me Later" to "Nhắc tôi sau",
+        "Skip Version" to "Bỏ qua phiên bản này",
+        "Amount" to "Số tiền",
+        "From (e.g. USD)" to "Từ (ví dụ USD)",
+        "To (e.g. EUR)" to "Sang (ví dụ EUR)",
+
         // Settings Screen
         "Settings & Preferences" to "Cài đặt & Tùy chọn",
         "App Theme Mode" to "Chế độ giao diện",
@@ -166,7 +185,18 @@ object LocalizationMap {
         "SAVE ITEM" to "GUARDAR ELEMENTO",
         "EDIT WARRANTY" to "EDITAR GARANTÍA",
         "DELETE WARRANTY" to "ELIMINAR GARANTÍA",
-        "DOWNLOAD CLAIM PDF" to "DESCARGAR PDF DE RECLAMACIÓN"
+        "DOWNLOAD CLAIM PDF" to "DESCARGAR PDF DE RECLAMACIÓN",
+        "UPC / EAN Barcode Auto-Fill" to "Autocompletar Código de Barras UPC / EAN",
+        "100% Free Open API" to "API Abierta 100% Gratuita",
+        "Product Barcode" to "Código de Barras del Producto",
+        "Lookup" to "Buscar",
+        "Bought abroad? Convert currency (Frankfurter API)" to "¿Compró en el extranjero? Convertir moneda (Frankfurter API)",
+        "Frankfurter Currency Converter" to "Convertidor de Moneda Frankfurter",
+        "Calculate Rate via Frankfurter API" to "Calcular Tasa vía Frankfurter API",
+        "APPLY TO RECEIPT PRICE" to "APLICAR AL PRECIO DEL RECIBO",
+        "ClaimVault Update Available" to "Actualización de ClaimVault Disponible",
+        "UPDATE NOW" to "ACTUALIZAR AHORA",
+        "Remind Me Later" to "Recordarme Más Tarde"
     )
 
     private val frMap = mapOf(
@@ -204,7 +234,18 @@ object LocalizationMap {
         "SAVE ITEM" to "ENREGISTRER",
         "EDIT WARRANTY" to "MODIFIER GARANTIE",
         "DELETE WARRANTY" to "SUPPRIMER GARANTIE",
-        "DOWNLOAD CLAIM PDF" to "TÉLÉCHARGER PDF DE RÉCLAMATION"
+        "DOWNLOAD CLAIM PDF" to "TÉLÉCHARGER PDF DE RÉCLAMATION",
+        "UPC / EAN Barcode Auto-Fill" to "Saisie Automatique Code-Barres UPC / EAN",
+        "100% Free Open API" to "API Ouverte 100% Gratuite",
+        "Product Barcode" to "Code-Barres Produit",
+        "Lookup" to "Chercher",
+        "Bought abroad? Convert currency (Frankfurter API)" to "Acheté à l'étranger? Convertir devise (Frankfurter API)",
+        "Frankfurter Currency Converter" to "Convertisseur de Devise Frankfurter",
+        "Calculate Rate via Frankfurter API" to "Calculer Taux via Frankfurter API",
+        "APPLY TO RECEIPT PRICE" to "APPLIQUER AU PRIX DU REÇU",
+        "ClaimVault Update Available" to "Mise à Jour ClaimVault Disponible",
+        "UPDATE NOW" to "METTRE À JOUR",
+        "Remind Me Later" to "Me Rappeler Plus Tard"
     )
 
     private val deMap = mapOf(
@@ -242,7 +283,18 @@ object LocalizationMap {
         "SAVE ITEM" to "SPEICHERN",
         "EDIT WARRANTY" to "BEARBEITEN",
         "DELETE WARRANTY" to "LÖSCHEN",
-        "DOWNLOAD CLAIM PDF" to "ANSPRUCHS-PDF HERUNTERLADEN"
+        "DOWNLOAD CLAIM PDF" to "ANSPRUCHS-PDF HERUNTERLADEN",
+        "UPC / EAN Barcode Auto-Fill" to "UPC / EAN Barcode Ausfüllen",
+        "100% Free Open API" to "100% Kostenlose Offene API",
+        "Product Barcode" to "Produkt-Barcode",
+        "Lookup" to "Suchen",
+        "Bought abroad? Convert currency (Frankfurter API)" to "Im Ausland gekauft? Währung umrechnen (Frankfurter API)",
+        "Frankfurter Currency Converter" to "Frankfurter Währungsrechner",
+        "Calculate Rate via Frankfurter API" to "Wechselkurs Berechnen",
+        "APPLY TO RECEIPT PRICE" to "AUF KAUFPREIS ANWENDEN",
+        "ClaimVault Update Available" to "ClaimVault Update Verfügbar",
+        "UPDATE NOW" to "JETZT AKTUALISIEREN",
+        "Remind Me Later" to "Später Erinnern"
     )
 
     fun translate(key: String, lang: AppLanguage): String {

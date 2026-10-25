@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +22,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,9 +35,11 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -43,9 +48,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,12 +58,12 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -78,18 +80,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.rememberAsyncImagePainter
+import com.example.data.repository.CurrencyRepository
 import com.example.ui.theme.EmeraldDark
 import com.example.ui.theme.EmeraldLightContainer
 import com.example.ui.theme.EmeraldPrimary
+import com.example.util.AppLanguage
+import com.example.util.localize
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import com.example.util.AppLanguage
-import com.example.util.localize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,6 +108,11 @@ fun AddEditWarrantyScreen(
     val isScanningOcr by viewModel.isScanningOcr.collectAsStateWithLifecycle()
     val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
 
+    val isLookingUpBarcode by viewModel.isLookingUpBarcode.collectAsStateWithLifecycle()
+    val barcodeSearchResult by viewModel.barcodeSearchResult.collectAsStateWithLifecycle()
+    val isConvertingCurrency by viewModel.isConvertingCurrency.collectAsStateWithLifecycle()
+    val currencyConversionState by viewModel.currencyConversionState.collectAsStateWithLifecycle()
+
     val editingItem = remember(editingItemId, allWarranties) {
         if (editingItemId != null && editingItemId > 0L) {
             allWarranties.find { it.id == editingItemId }
@@ -115,7 +124,7 @@ fun AddEditWarrantyScreen(
     var priceText by remember { mutableStateOf(editingItem?.price?.toString() ?: "") }
     var currency by remember { mutableStateOf(editingItem?.currency ?: try { java.util.Currency.getInstance(Locale.getDefault())?.symbol ?: "$" } catch(e: Exception) { "$" }) }
     var category by remember { mutableStateOf(editingItem?.category ?: "Electronics") }
-    var warrantyDurationMonths by remember { mutableIntStateOf(editingItem?.warrantyDurationMonths ?: 12) } // 12, 24, 36, -1
+    var warrantyDurationMonths by remember { mutableIntStateOf(editingItem?.warrantyDurationMonths ?: 12) }
     var serialNumber by remember { mutableStateOf(editingItem?.serialNumber ?: "") }
     var modelNumber by remember { mutableStateOf(editingItem?.modelNumber ?: "") }
     var notes by remember { mutableStateOf(editingItem?.notes ?: "") }
@@ -124,6 +133,12 @@ fun AddEditWarrantyScreen(
     var receiptImagePath by remember { mutableStateOf<String?>(editingItem?.receiptImagePath) }
 
     var ocrDetectedText by remember { mutableStateOf<String?>(null) }
+
+    // Barcode Lookup state
+    var barcodeInput by remember { mutableStateOf("") }
+
+    // Foreign Currency Converter Dialog State
+    var showCurrencyDialog by remember { mutableStateOf(false) }
 
     // Check if returned from CameraScanScreen
     LaunchedEffect(Unit) {
@@ -386,6 +401,109 @@ fun AddEditWarrantyScreen(
                 }
             }
 
+            // 100% FREE OPEN BARCODE LOOKUP CARD (UPC/EAN)
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("barcode_lookup_card"),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "UPC / EAN Barcode Auto-Fill".localize(appLanguage),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Surface(color = EmeraldLightContainer, shape = RoundedCornerShape(6.dp)) {
+                            Text(
+                                text = "100% Free Open API".localize(appLanguage),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = EmeraldDark,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = barcodeInput,
+                            onValueChange = { barcodeInput = it },
+                            label = { Text("Product Barcode".localize(appLanguage)) },
+                            placeholder = { Text("e.g. 012345678905") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("input_barcode"),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
+                        )
+
+                        Button(
+                            onClick = {
+                                viewModel.lookupBarcode(barcodeInput) { prod ->
+                                    if (prod != null) {
+                                        if (title.isBlank() || title.startsWith("Item UPC")) title = prod.title
+                                        if (merchant.isBlank() || merchant == "Store") merchant = prod.brand
+                                        category = prod.category
+                                        if (modelNumber.isBlank()) modelNumber = prod.modelNumber
+                                    }
+                                }
+                            },
+                            enabled = barcodeInput.isNotBlank() && !isLookingUpBarcode,
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary, contentColor = Color.Black),
+                            modifier = Modifier.testTag("barcode_lookup_button")
+                        ) {
+                            if (isLookingUpBarcode) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Black)
+                            } else {
+                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Lookup".localize(appLanguage), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    if (barcodeSearchResult != null) {
+                        Surface(
+                            color = EmeraldLightContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = EmeraldDark, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Auto-filled: ${barcodeSearchResult!!.brand} ${barcodeSearchResult!!.title}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = EmeraldDark,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Step 2: Product & Merchant Info
             Text(
                 text = "Product Information".localize(appLanguage),
@@ -444,6 +562,27 @@ fun AddEditWarrantyScreen(
                 )
             }
 
+            // FRANKFURTER API CURRENCY CONVERTER ACTION BUTTON
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = { showCurrencyDialog = true },
+                    modifier = Modifier.testTag("open_currency_converter_button")
+                ) {
+                    Icon(Icons.Default.CurrencyExchange, contentDescription = null, tint = EmeraldDark, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Bought abroad? Convert currency (Frankfurter API)".localize(appLanguage),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = EmeraldDark,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             // Purchase Date Picker
             OutlinedTextField(
                 value = dateFormat.format(Date(purchaseDateEpoch)),
@@ -473,7 +612,7 @@ fun AddEditWarrantyScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                if (ocrDetectedText != null) {
+                if (ocrDetectedText != null || barcodeSearchResult != null) {
                     Surface(
                         color = EmeraldLightContainer,
                         shape = RoundedCornerShape(6.dp)
@@ -703,8 +842,174 @@ fun AddEditWarrantyScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+
+        // Frankfurter API Currency Converter Dialog
+        if (showCurrencyDialog) {
+            CurrencyConverterDialog(
+                purchaseDateEpoch = purchaseDateEpoch,
+                currentPrice = priceText.toDoubleOrNull() ?: 0.0,
+                currentCurrency = currency,
+                appLanguage = appLanguage,
+                isConverting = isConvertingCurrency,
+                conversionResult = currencyConversionState,
+                onConvert = { amt, fromCode, targetCode ->
+                    viewModel.convertCurrency(amt, fromCode, targetCode, purchaseDateEpoch)
+                },
+                onApply = { convertedAmt, targetCode ->
+                    priceText = String.format(Locale.US, "%.2f", convertedAmt)
+                    currency = targetCode
+                    showCurrencyDialog = false
+                    viewModel.clearCurrencyConversion()
+                },
+                onDismiss = {
+                    showCurrencyDialog = false
+                    viewModel.clearCurrencyConversion()
+                }
+            )
+        }
     }
 }
+}
+
+@Composable
+fun CurrencyConverterDialog(
+    purchaseDateEpoch: Long,
+    currentPrice: Double,
+    currentCurrency: String,
+    appLanguage: AppLanguage,
+    isConverting: Boolean,
+    conversionResult: com.example.data.repository.CurrencyConversionResult?,
+    onConvert: (Double, String, String) -> Unit,
+    onApply: (Double, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var amountText by remember { mutableStateOf(if (currentPrice > 0.0) currentPrice.toString() else "100.00") }
+    var fromCurrency by remember { mutableStateOf("USD") }
+    var targetCurrency by remember { mutableStateOf("EUR") }
+
+    val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(purchaseDateEpoch))
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .testTag("currency_converter_dialog"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CurrencyExchange, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Frankfurter Currency Converter".localize(appLanguage),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Text(
+                    text = "Convert foreign receipt price on purchase date ($dateStr) using 100% free European Central Bank rates.".localize(appLanguage),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Amount".localize(appLanguage)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("foreign_amount_input"),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = fromCurrency,
+                        onValueChange = { fromCurrency = it.uppercase(Locale.US) },
+                        label = { Text("From (e.g. USD)".localize(appLanguage)) },
+                        modifier = Modifier.weight(1f).testTag("from_currency_input"),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
+                    )
+
+                    Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = EmeraldPrimary)
+
+                    OutlinedTextField(
+                        value = targetCurrency,
+                        onValueChange = { targetCurrency = it.uppercase(Locale.US) },
+                        label = { Text("To (e.g. EUR)".localize(appLanguage)) },
+                        modifier = Modifier.weight(1f).testTag("target_currency_input"),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = EmeraldPrimary)
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        val amt = amountText.toDoubleOrNull() ?: 0.0
+                        onConvert(amt, fromCurrency, targetCurrency)
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("fetch_exchange_rate_button"),
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary, contentColor = Color.Black),
+                    enabled = amountText.toDoubleOrNull() != null && !isConverting
+                ) {
+                    if (isConverting) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.Black)
+                    } else {
+                        Text("Calculate Rate via Frankfurter API".localize(appLanguage), fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                if (conversionResult != null) {
+                    Surface(
+                        color = EmeraldLightContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "${conversionResult.originalAmount} ${conversionResult.fromCurrency} = ${String.format(Locale.US, "%.2f", conversionResult.targetAmount)} ${conversionResult.targetCurrency}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = EmeraldDark
+                            )
+                            Text(
+                                text = "Rate: 1 ${conversionResult.fromCurrency} = ${conversionResult.rate} ${conversionResult.targetCurrency} (${conversionResult.date})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = EmeraldDark
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Button(
+                                onClick = { onApply(conversionResult.targetAmount, conversionResult.targetCurrency) },
+                                modifier = Modifier.fillMaxWidth().testTag("apply_converted_rate_button"),
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldDark, contentColor = Color.White)
+                            ) {
+                                Text("APPLY TO RECEIPT PRICE".localize(appLanguage), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel".localize(appLanguage))
+                    }
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

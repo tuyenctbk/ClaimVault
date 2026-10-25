@@ -77,6 +77,8 @@ class MainActivity : FragmentActivity() {
             val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsStateWithLifecycle()
             val showRateDialog by viewModel.smartPromptManager.showRateDialog.collectAsStateWithLifecycle()
             val showShareDialog by viewModel.smartPromptManager.showShareDialog.collectAsStateWithLifecycle()
+            val showUpdateDialog by viewModel.smartPromptManager.showUpdateDialog.collectAsStateWithLifecycle()
+            val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
 
             var isBiometricAuthenticated by remember { mutableStateOf(false) }
 
@@ -166,7 +168,7 @@ class MainActivity : FragmentActivity() {
                         }
                     }
 
-                    // Smart Dialog Triggers
+                    // Smart Dialog Triggers (With Mutual Exclusion Guarantee)
                     if (showRateDialog) {
                         RateAppDialog(
                             onDismiss = { viewModel.smartPromptManager.dismissRateDialog(neverShowAgain = false) },
@@ -177,14 +179,22 @@ class MainActivity : FragmentActivity() {
                                 Toast.makeText(this@MainActivity, "Thank you for rating ClaimVault!", Toast.LENGTH_SHORT).show()
                             }
                         )
-                    }
-
-                    if (showShareDialog) {
+                    } else if (showShareDialog) {
                         ShareAppDialog(
                             onDismiss = { viewModel.smartPromptManager.dismissShareDialog() },
                             onShare = {
                                 viewModel.smartPromptManager.shareApp()
                             }
+                        )
+                    } else if (showUpdateDialog) {
+                        com.example.ui.components.UpdateAppDialog(
+                            newVersionName = viewModel.smartPromptManager.latestVersionName,
+                            updateHighlights = viewModel.smartPromptManager.latestVersionHighlights,
+                            appLanguage = appLanguage,
+                            onDismiss = { viewModel.smartPromptManager.dismissUpdateDialog(remindLater = true) },
+                            onRemindLater = { viewModel.smartPromptManager.dismissUpdateDialog(remindLater = true) },
+                            onIgnoreVersion = { viewModel.smartPromptManager.dismissUpdateDialog(ignoreVersion = true) },
+                            onUpdateNow = { viewModel.smartPromptManager.openAppUpdateLink() }
                         )
                     }
 

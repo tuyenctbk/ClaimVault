@@ -1,43 +1,107 @@
-# Built artifacts
+# ====================================================================
+# Android & Java Build Artifacts
+# ====================================================================
 *.apk
+*.ap_
 *.aab
 *.aar
-*.jks
+*.dex
+*.class
+*.so
+*.dylib
+*.dll
+*.flat
 
-# Gradle
-.gradle
+# Packages & Archives
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# ====================================================================
+# Gradle & Build Directories
+# ====================================================================
+.gradle/
+.gradle_home/
+build/
+**/build/
 /build
 /app/build
-# (keep wrapper)
-!gradle/wrapper/gradle-wrapper.jar
+/captures/
+.externalNativeBuild/
+.cxx/
+**/.externalNativeBuild/
+**/.cxx/
 
+# ====================================================================
 # Kotlin
-.kotlin
+# ====================================================================
+.kotlin/
 *.kotlin_module
 
-# Android Studio / IntelliJ
-.idea
+# ====================================================================
+# IDEs & Editors (Android Studio / IntelliJ / VS Code)
+# ====================================================================
+.idea/
 *.iml
 *.ipr
 *.iws
-/out
+/out/
+.vscode/
+.fleet/
+.navigation/
+.settings/
+.project
+.classpath
 
-# Local configuration
+# Android Studio Diagnostics
+*.hprof
+
+# ====================================================================
+# Local Configurations, Secrets & Keystores
+# ====================================================================
 local.properties
+secrets.properties
 .env
+.env.local
+.env.*.local
 .env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+debug.keystore
 
-# OS generated files
+# ====================================================================
+# Temporary Files, Logs & Backups
+# ====================================================================
+*.log
+tmp/
+*.tmp
+*.bak
+*.swp
+*~
+
+# ====================================================================
+# Operating System Files
+# ====================================================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Captures and profiling
-/captures
-*.hprof
-.externalNativeBuild
-.cxx
-
-# User requested & Project specific
+# ====================================================================
+# Project Specific & User Scratch Files
+# ====================================================================
 *.py
 *.sh
 *implementation*
